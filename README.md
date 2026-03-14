@@ -9,7 +9,7 @@ git clone <your-repo-url>
 cd food_network/mobile
 npm install
 cp .env.example .env   # Edit .env with your keys
-npm start
+npm start or npx expo start --tunnel
 ```
 
 **Full setup:** See [SETUP.md](./SETUP.md) for detailed instructions.

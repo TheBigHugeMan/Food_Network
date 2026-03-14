@@ -9,19 +9,29 @@ How to clone, configure, and run the project.
   - **iOS**: Mac with Xcode (for simulator)
   - **Android**: Android Studio with emulator
 - **Git**
+- **Supabase** account (supabase.com)
 
 ---
 
 ## 1. Clone the repo
 
 ```bash
-git clone
+git clone <your-repo-url>
 cd food_network
 ```
 
 ---
 
-## 2. Mobile app setup
+## 2. Supabase setup
+
+1. Create a project at [supabase.com](https://supabase.com) (or use an existing one).
+2. Go to **SQL Editor** → **New query**.
+3. Copy the contents of `supabase/schema.sql` and run it.
+4. This creates: `profiles`, `restaurants`, RLS policies, and seeds 2 sample restaurants.
+
+---
+
+## 3. Mobile app setup
 
 ```bash
 cd mobile
@@ -58,19 +68,25 @@ Then:
 
 ---
 
-## 3. Backend setup (when ready)
-
-The backend is in `../dashboard/backend/` or will be added to this repo.
+## 4. Backend setup (when ready)
 
 ```bash
-cd backend  # or path to FastAPI project
-pip install -r requirements.txt
+cd backend
+pip install fastapi uvicorn python-dotenv
+cp .env.example .env
 ```
 
-Set env vars: `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `GEMINI_API_KEY`, `FRONTEND_URL`
+Edit `.env` and add:
+
+| Variable | Where to get it |
+|----------|-----------------|
+| `SUPABASE_URL` | Supabase Dashboard → Project Settings → API |
+| `SUPABASE_SERVICE_KEY` | Same place (use **service_role** key, not anon) |
+| `GEMINI_API_KEY` | Google AI Studio |
+| `FRONTEND_URL` | `http://localhost:8081` for dev |
 
 ```bash
-python main.py
+uvicorn main:app --reload --port 8000
 ```
 
 ---
@@ -93,3 +109,10 @@ python main.py
 | `npm start` | `mobile/` |
 | `npm run ios` | `mobile/` |
 | `npm run android` | `mobile/` |
+| `uvicorn main:app --reload --port 8000` | `backend/` |
+
+## Env vars summary
+
+**Mobile** (`mobile/.env`): `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`, `EXPO_PUBLIC_API_URL`
+
+**Backend** (`backend/.env`): `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `GEMINI_API_KEY`, `FRONTEND_URL`
