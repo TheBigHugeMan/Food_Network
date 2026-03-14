@@ -29,6 +29,18 @@ cd food_network
 3. Copy the contents of `supabase/schema.sql` and run it.
 4. This creates: `profiles`, `restaurants`, RLS policies, and seeds 2 sample restaurants.
 
+### Google Auth (Sign in with Google)
+
+1. In Supabase: **Authentication** → **Providers** → **Google** → Enable it.
+2. In [Google Cloud Console](https://console.cloud.google.com/apis/credentials):
+   - Create **OAuth 2.0 Client ID** (Web application)
+   - **Authorized redirect URIs**: add `https://<YOUR_PROJECT_REF>.supabase.co/auth/v1/callback`
+   - Copy the **Client ID** and **Client Secret** into Supabase Google provider settings
+3. Add your app's redirect URL to Supabase: **Authentication** → **URL Configuration** → **Redirect URLs**:
+   - **Expo Go**: Run `npx expo start`, then add `exp://<YOUR_IP>:8081` (e.g. `exp://192.168.1.5:8081`)
+   - **Tunnel mode**: Run `npx expo start --tunnel`, copy the `https://xxx.exp.direct` URL and add it
+   - **Custom scheme** (dev builds): Add `foodnetwork://auth/callback`
+
 ---
 
 ## 3. Mobile app setup

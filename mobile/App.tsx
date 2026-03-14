@@ -1,9 +1,11 @@
 import 'react-native-url-polyfill/auto';
 import { StatusBar } from 'expo-status-bar';
+import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
+import { AuthProvider, useAuth } from './lib/auth-context';
 import { LoginScreen } from './app/screens/LoginScreen';
 import { HomeScreen } from './app/screens/HomeScreen';
 import { MapScreen } from './app/screens/MapScreen';
@@ -47,20 +49,44 @@ function MainTabs() {
   );
 }
 
-export default function App() {
-  // TODO: Add auth check - show LoginScreen if not signed in
-  const isSignedIn = true; // Set to false when auth is wired; true for dev/demo
+function RootNavigator() {
+  const { session, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <View style={styles.loading}>
+        <ActivityIndicator size="large" color="#e85d26" />
+      </View>
+    );
+  }
 
   return (
-    <NavigationContainer>
-      <StatusBar style="auto" />
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
-        {!isSignedIn ? (
-          <Stack.Screen name="Login" component={LoginScreen} />
-        ) : (
-          <Stack.Screen name="Main" component={MainTabs} />
-        )}
-      </Stack.Navigator>
-    </NavigationContainer>
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      {!session ? (
+        <Stack.Screen name="Login" component={LoginScreen} />
+      ) : (
+        <Stack.Screen name="Main" component={MainTabs} />
+      )}
+    </Stack.Navigator>
   );
 }
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <NavigationContainer>
+        <StatusBar style="auto" />
+        <RootNavigator />
+      </NavigationContainer>
+    </AuthProvider>
+  );
+}
+
+const styles = StyleSheet.create({
+  loading: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+  },
+});
