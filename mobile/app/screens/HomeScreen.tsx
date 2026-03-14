@@ -8,10 +8,39 @@ import {
   ScrollView,
   ActivityIndicator,
 } from 'react-native';
+import { RestaurantCard } from '../components/RestaurantCard';
+
+const MOCK_RECOMMENDATIONS = [
+  {
+    id: '1',
+    name: 'Sakura Ramen',
+    cuisine: 'Japanese',
+    rating: 4.7,
+    photo_url: 'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=600&q=80',
+    address: '123 Main St, San Francisco, CA',
+  },
+  {
+    id: '2',
+    name: 'Bella Italia',
+    cuisine: 'Italian',
+    rating: 4.3,
+    photo_url: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=600&q=80',
+    address: '456 Columbus Ave, San Francisco, CA',
+  },
+  {
+    id: '3',
+    name: 'Spice Garden',
+    cuisine: 'Indian',
+    rating: 4.5,
+    photo_url: 'https://images.unsplash.com/photo-1585937421612-70a008356fbe?w=600&q=80',
+    address: '789 Mission St, San Francisco, CA',
+  },
+];
+
 export function HomeScreen() {
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
-  const [results, setResults] = useState<any[]>([]);
+  const [results, setResults] = useState<typeof MOCK_RECOMMENDATIONS>([]);
 
   const handleSearch = async () => {
     setLoading(true);
@@ -19,6 +48,8 @@ export function HomeScreen() {
     await new Promise((r) => setTimeout(r, 1000));
     setLoading(false);
   };
+
+  const recommendations = results.length > 0 ? results : MOCK_RECOMMENDATIONS;
 
   return (
     <View style={styles.container}>
@@ -42,9 +73,28 @@ export function HomeScreen() {
           )}
         </Pressable>
       </View>
-      <ScrollView style={styles.results}>
-        {results.length === 0 && !loading && (
-          <Text style={styles.placeholder}>Enter a query and search</Text>
+
+      <ScrollView style={styles.results} showsVerticalScrollIndicator={false}>
+        {loading && (
+          <ActivityIndicator size="large" color="#4285F4" style={styles.loader} />
+        )}
+
+        {!loading && (
+          <>
+            <Text style={styles.sectionLabel}>
+              {results.length > 0 ? 'Search Results' : 'Recommended for You'}
+            </Text>
+            {recommendations.map((r) => (
+              <RestaurantCard
+                key={r.id}
+                name={r.name}
+                cuisine={r.cuisine}
+                rating={r.rating}
+                photo_url={r.photo_url}
+                address={r.address}
+              />
+            ))}
+          </>
         )}
       </ScrollView>
     </View>
@@ -81,4 +131,11 @@ const styles = StyleSheet.create({
   searchButtonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
   results: { flex: 1 },
   placeholder: { color: '#999', textAlign: 'center', marginTop: 48 },
+  loader: { marginTop: 48 },
+  sectionLabel: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#333',
+    marginBottom: 12,
+  },
 });
