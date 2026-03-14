@@ -51,3 +51,25 @@ export async function searchRestaurants(
 
   return response.json();
 }
+
+export async function uploadProfileImage(uri: string, userId: string): Promise<{ avatar_url: string }> {
+  const filename = uri.split('/').pop();
+  const match = /\.(\w+)$/.exec(filename || '');
+  const type = match ? `image/${match[1]}` : `image`;
+
+  const formData = new FormData();
+  // @ts-ignore - React Native FormData expects an object with uri, name, and type properties
+  formData.append('file', { uri, name: filename, type });
+  formData.append('user_id', userId);
+
+  const response = await fetch(`${API_URL}/api/profile/image`, {
+    method: 'POST',
+    body: formData,
+  });
+
+  if (!response.ok) {
+    throw new Error(`Upload failed: ${response.status}`);
+  }
+
+  return response.json();
+}

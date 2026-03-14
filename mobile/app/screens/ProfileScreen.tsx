@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { RadarChart } from '@salmonco/react-native-radar-chart';
+import { uploadProfileImage } from '../lib/api';
 import mockUser from '../data/mockUser.json';
 
 const SCREEN_W = Dimensions.get('window').width;
@@ -32,7 +33,16 @@ export function ProfileScreen() {
       quality: 0.8,
     });
     if (!result.canceled) {
-      setAvatarUri(result.assets[0].uri);
+      const uri = result.assets[0].uri;
+      setAvatarUri(uri); // Optimistic UI update
+      
+      try {
+        const response = await uploadProfileImage(uri, (mockUser as any).id || 'test-user-id');
+        setAvatarUri(response.avatar_url); // Switch to the official backend URL
+      } catch (error) {
+        console.error('Failed to upload image:', error);
+        Alert.alert('Upload Error', 'Could not save profile image to the backend.');
+      }
     }
   };
 
