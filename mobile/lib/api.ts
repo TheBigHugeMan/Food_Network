@@ -3,7 +3,10 @@
  * Set EXPO_PUBLIC_API_URL in .env (e.g. http://localhost:8000 or your Render URL)
  */
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:8000';
+// Temporarily hardcode the IP address since the .env file isn't being picked up
+const API_URL = 'http://192.168.0.11:8000';
+
+console.log('Current API_URL is:', API_URL);
 
 export interface Restaurant {
   place_id: string;
@@ -62,13 +65,25 @@ export async function uploadProfileImage(uri: string, userId: string): Promise<{
   formData.append('file', { uri, name: filename, type });
   formData.append('user_id', userId);
 
-  const response = await fetch(`${API_URL}/api/profile/image`, {
-    method: 'POST',
-    body: formData,
-  });
+  console.log(`Attempting upload to: ${API_URL}/api/profile/image`);
+
+  let response;
+  try {
+    response = await fetch(`${API_URL}/api/profile/image`, {
+      method: 'POST',
+      body: formData,
+    });
+  } catch (error) {
+    console.error(`Fetch failed completely. Is the server reachable at ${API_URL}?`);
+    throw error;
+  }
 
   if (!response.ok) {
-    throw new Error(`Upload failed: ${response.status}`);
+    // Extract the exact error message sent from FastAPI
+    const errorData = await response.json().catch(() => null);
+    const errorMessage = errorData?.detail || response.statusText;
+    console.error(`Backend error details:`, errorMessage);
+    throw new Error(`Upload failed: ${response.status} - ${errorMessage}`);
   }
 
   return response.json();

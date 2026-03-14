@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { RadarChart } from '@salmonco/react-native-radar-chart';
-import { uploadProfileImage } from '../lib/api';
+import { uploadProfileImage } from '../../lib/api';
 import mockUser from '../data/mockUser.json';
 
 const SCREEN_W = Dimensions.get('window').width;
@@ -27,7 +27,7 @@ export function ProfileScreen() {
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.8,
@@ -37,7 +37,8 @@ export function ProfileScreen() {
       setAvatarUri(uri); // Optimistic UI update
       
       try {
-        const response = await uploadProfileImage(uri, (mockUser as any).id || 'test-user-id');
+        // Using a valid UUID format so the database doesn't reject the type
+        const response = await uploadProfileImage(uri, (mockUser as any).id || '00000000-0000-0000-0000-000000000000');
         setAvatarUri(response.avatar_url); // Switch to the official backend URL
       } catch (error) {
         console.error('Failed to upload image:', error);
