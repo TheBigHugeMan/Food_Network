@@ -15,11 +15,9 @@ How to clone, configure, and run the project.
 ## 1. Clone the repo
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/food_network.git
+git clone
 cd food_network
 ```
-
-*(Replace with your actual repo URL.)*
 
 ---
 
@@ -62,7 +60,7 @@ Then:
 
 ## 3. Backend setup (when ready)
 
-The backend is in `../Yumi/dashboard/backend/` or will be added to this repo.
+The backend is in `../dashboard/backend/` or will be added to this repo.
 
 ```bash
 cd backend  # or path to FastAPI project
