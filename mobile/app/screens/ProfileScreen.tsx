@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { RadarChart } from '@salmonco/react-native-radar-chart';
+import { useAuth } from '../../lib/auth-context';
 import mockUser from '../data/mockUser.json';
 
 const SCREEN_W = Dimensions.get('window').width;
@@ -18,6 +19,14 @@ const CARD_W = (SCREEN_W - 48 - 12) / 4; // 4 cards, 16px side padding, 4 gaps o
 
 export function ProfileScreen() {
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
+  const { signOut } = useAuth();
+
+  const handleSignOut = () => {
+    Alert.alert('Sign out', 'Are you sure you want to sign out?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Sign out', style: 'destructive', onPress: signOut },
+    ]);
+  };
 
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -135,7 +144,7 @@ export function ProfileScreen() {
       <View style={styles.divider} />
 
       {/* ── Cuisine frequency bar chart ── */}
-      <View style={[styles.section, styles.lastSection]}>
+      <View style={styles.section}>
         <Text style={styles.sectionTitle}>Favourite Cuisines</Text>
         {mockUser.cuisineFrequency.map((item) => (
           <View key={item.cuisine} style={styles.barRow}>
@@ -151,6 +160,22 @@ export function ProfileScreen() {
             <Text style={styles.barCount}>{item.count}</Text>
           </View>
         ))}
+      </View>
+
+      <View style={styles.divider} />
+
+      {/* ── Settings ── */}
+      <View style={[styles.section, styles.lastSection]}>
+        <Text style={styles.sectionTitle}>Settings</Text>
+        <View style={styles.menuCard}>
+          <Pressable
+            style={({ pressed }) => [styles.menuRow, pressed && styles.menuRowPressed]}
+            onPress={handleSignOut}
+          >
+            <Text style={styles.menuRowTextDanger}>Sign out</Text>
+            <Text style={styles.menuRowChevron}>›</Text>
+          </Pressable>
+        </View>
       </View>
 
     </ScrollView>
@@ -353,5 +378,35 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#888',
     textAlign: 'right',
+  },
+
+  // Settings / menu
+  menuCard: {
+    borderWidth: 1,
+    borderColor: '#f0f0f0',
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: '#fff',
+  },
+  menuRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    backgroundColor: '#fff',
+  },
+  menuRowPressed: {
+    backgroundColor: '#fafafa',
+  },
+  menuRowTextDanger: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: '#e03d3d',
+  },
+  menuRowChevron: {
+    fontSize: 20,
+    color: '#ccc',
+    lineHeight: 22,
   },
 });
