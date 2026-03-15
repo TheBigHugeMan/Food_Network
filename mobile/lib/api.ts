@@ -126,6 +126,7 @@ export interface RestaurantChatRequest {
   history?: ChatMessage[];
   latitude?: number;
   longitude?: number;
+  suburb?: string;
 }
 
 export interface RestaurantRecommendation {
@@ -133,6 +134,7 @@ export interface RestaurantRecommendation {
   address?: string | null;
   cuisine?: string | null;
   rating?: number | null;
+  photo_url?: string | null;
   reasoning?: string | null;
 }
 
@@ -157,6 +159,7 @@ export async function sendRestaurantChatMessage(
       history: body.history ?? [],
       latitude: body.latitude ?? null,
       longitude: body.longitude ?? null,
+      suburb: body.suburb ?? null,
     }),
   });
 

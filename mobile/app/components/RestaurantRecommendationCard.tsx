@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, Image } from 'react-native';
 import type { RestaurantRecommendation } from '../../lib/api';
 
 export type RestaurantRecommendationCardProps = {
@@ -23,29 +23,38 @@ function StarRating({ rating }: { rating: number }) {
 }
 
 export function RestaurantRecommendationCard({ recommendation }: RestaurantRecommendationCardProps) {
-  const { name, address, cuisine, rating, reasoning } = recommendation;
+  const { name, address, cuisine, rating, photo_url, reasoning } = recommendation;
   return (
     <View style={styles.card}>
-      <View style={styles.header}>
-        <Text style={styles.name} numberOfLines={1}>{name}</Text>
-        {cuisine ? (
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>{cuisine}</Text>
+      {photo_url ? (
+        <Image source={{ uri: photo_url }} style={styles.photo} />
+      ) : (
+        <View style={styles.photoPlaceholder}>
+          <Text style={styles.photoPlaceholderText}>🍽️</Text>
+        </View>
+      )}
+      <View style={styles.content}>
+        <View style={styles.header}>
+          <Text style={styles.name} numberOfLines={1}>{name}</Text>
+          {cuisine ? (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>{cuisine}</Text>
+            </View>
+          ) : null}
+        </View>
+        {rating != null && (
+          <StarRating rating={rating} />
+        )}
+        {address ? (
+          <View style={styles.addressRow}>
+            <Text style={styles.pin}>📍</Text>
+            <Text style={styles.address} numberOfLines={2}>{address}</Text>
           </View>
         ) : null}
+        {reasoning ? (
+          <Text style={styles.reasoning}>{reasoning}</Text>
+        ) : null}
       </View>
-      {rating != null && (
-        <StarRating rating={rating} />
-      )}
-      {address ? (
-        <View style={styles.addressRow}>
-          <Text style={styles.pin}>📍</Text>
-          <Text style={styles.address} numberOfLines={2}>{address}</Text>
-        </View>
-      ) : null}
-      {reasoning ? (
-        <Text style={styles.reasoning}>{reasoning}</Text>
-      ) : null}
     </View>
   );
 }
@@ -54,10 +63,28 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: '#fff',
     borderRadius: 12,
-    padding: 12,
-    marginBottom: 8,
+    width: 210,
     borderWidth: 1,
     borderColor: '#eee',
+    overflow: 'hidden',
+  },
+  photo: {
+    width: '100%',
+    height: 120,
+    backgroundColor: '#f0f0f0',
+  },
+  photoPlaceholder: {
+    width: '100%',
+    height: 120,
+    backgroundColor: '#f0f0f0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  photoPlaceholderText: {
+    fontSize: 36,
+  },
+  content: {
+    padding: 10,
   },
   header: {
     flexDirection: 'row',

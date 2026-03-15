@@ -68,11 +68,16 @@ export function ChatMessageList({
               {msg.content}
             </Text>
             {msg.role === 'assistant' && msg.restaurants && msg.restaurants.length > 0 && (
-              <View style={styles.cardsWrap}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={styles.cardsScroll}
+                contentContainerStyle={styles.cardsScrollContent}
+              >
                 {msg.restaurants.map((rec, i) => (
                   <RestaurantRecommendationCard key={i} recommendation={rec} />
                 ))}
-              </View>
+              </ScrollView>
             )}
           </View>
         </View>
@@ -156,8 +161,12 @@ const styles = StyleSheet.create({
   assistantText: {
     color: '#222',
   },
-  cardsWrap: {
+  cardsScroll: {
     marginTop: 12,
-    gap: 0,
+    marginHorizontal: -16,
+  },
+  cardsScrollContent: {
+    paddingHorizontal: 16,
+    gap: 10,
   },
 });

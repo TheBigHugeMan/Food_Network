@@ -9,6 +9,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import * as Location from 'expo-location';
 import { DEMO_GRAPH } from '../data/demoGraph';
 import { SocialGraph } from '../components/SocialGraph';
 import { NetworkChatSection } from '../components/NetworkChatSection';
@@ -48,6 +49,47 @@ export function NetworkScreen() {
   const [messages, setMessages] = useState<ChatMessageWithRestaurants[]>([]);
   const [input, setInput] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
+  const [locationState, setLocationState] = useState<
+    | { status: 'pending' }
+    | { status: 'granted'; latitude: number; longitude: number; suburb?: string }
+    | { status: 'denied' }
+  >({ status: 'pending' });
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        if (!cancelled) setLocationState({ status: 'denied' });
+        return;
+      }
+      try {
+        const pos = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        });
+        let detectedSuburb: string | undefined;
+        try {
+          const [geo] = await Location.reverseGeocodeAsync({
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude,
+          });
+          detectedSuburb = geo?.district ?? geo?.subregion ?? geo?.city ?? undefined;
+        } catch {
+          // non-fatal
+        }
+        if (!cancelled)
+          setLocationState({
+            status: 'granted',
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude,
+            suburb: detectedSuburb,
+          });
+      } catch {
+        if (!cancelled) setLocationState({ status: 'denied' });
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   const onScrollBeginDrag = useCallback(() => setIsScrolling(true), []);
   const onScrollEndDrag = useCallback(() => setIsScrolling(false), []);
@@ -127,8 +169,9 @@ export function NetworkScreen() {
       const res = await sendRestaurantChatMessage(session.access_token, {
         message: text,
         history,
-        latitude: undefined,
-        longitude: undefined,
+        latitude: locationState.status === 'granted' ? (locationState as any).latitude : undefined,
+        longitude: locationState.status === 'granted' ? (locationState as any).longitude : undefined,
+        suburb: locationState.status === 'granted' ? (locationState as any).suburb : undefined,
       });
       appendAssistant(res.reply, res.restaurants ?? []);
     } catch (e) {

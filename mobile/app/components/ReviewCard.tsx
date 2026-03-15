@@ -59,7 +59,7 @@ const styles = StyleSheet.create({
   },
   image: {
     width: '100%',
-    height: 180,
+    aspectRatio: 1,
     backgroundColor: '#f0f0f0',
   },
   body: {

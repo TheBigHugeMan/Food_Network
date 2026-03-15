@@ -162,6 +162,78 @@ export function ProfileScreen() {
         </Pressable>
         <Text style={styles.name}>{profile?.display_name || profile?.username || 'Unknown'}</Text>
         <Text style={styles.username}>{profile?.username || ''}</Text>
+        <View style={styles.bioRow}>
+          {profile?.bio ? (
+            <Text style={styles.bio}>{profile.bio}</Text>
+          ) : (
+            <Text style={styles.bioPlaceholder}>No bio yet — tell people about yourself!</Text>
+          )}
+          <Pressable
+            onPress={() => {
+              setBioText(profile?.bio || '');
+              setBioModalVisible(true);
+            }}
+            style={styles.bioEditButton}
+          >
+            <Text style={styles.bioEditButtonText}>{profile?.bio ? '✎' : '+ Add bio'}</Text>
+          </Pressable>
+        </View>
+
+        {/* ── Bio edit modal ── */}
+        <Modal
+          visible={bioModalVisible}
+          animationType="slide"
+          transparent
+          onRequestClose={() => setBioModalVisible(false)}
+        >
+          <KeyboardAvoidingView
+            style={styles.modalOverlay}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          >
+            <View style={styles.modalSheet}>
+              <Text style={styles.modalTitle}>{profile?.bio ? 'Edit Bio' : 'Add Bio'}</Text>
+              <TextInput
+                style={styles.bioInput}
+                value={bioText}
+                onChangeText={setBioText}
+                placeholder="Write something about yourself…"
+                placeholderTextColor="#aaa"
+                multiline
+                maxLength={300}
+                autoFocus
+              />
+              <Text style={styles.bioCharCount}>{bioText.length}/300</Text>
+              <View style={styles.modalButtons}>
+                <Pressable
+                  style={[styles.modalBtn, styles.modalBtnCancel]}
+                  onPress={() => setBioModalVisible(false)}
+                >
+                  <Text style={styles.modalBtnCancelText}>Cancel</Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.modalBtn, styles.modalBtnSave, isSavingBio && styles.modalBtnDisabled]}
+                  disabled={isSavingBio}
+                  onPress={async () => {
+                    if (!session) return;
+                    setIsSavingBio(true);
+                    try {
+                      await updateBio(session.user.id, bioText.trim(), session.access_token);
+                      setProfile((prev) => prev ? { ...prev, bio: bioText.trim() } : prev);
+                      setBioModalVisible(false);
+                    } catch (err) {
+                      console.error('Failed to save bio:', err);
+                      Alert.alert('Error', 'Could not save bio. Please try again.');
+                    } finally {
+                      setIsSavingBio(false);
+                    }
+                  }}
+                >
+                  <Text style={styles.modalBtnSaveText}>{isSavingBio ? 'Saving…' : 'Save'}</Text>
+                </Pressable>
+              </View>
+            </View>
+          </KeyboardAvoidingView>
+        </Modal>
       </View>
 
       {/* ── Stats ── */}
@@ -193,82 +265,6 @@ export function ProfileScreen() {
           reviews.map((r) => <ReviewCard key={r.id} review={r} />)
         )}
       </View>
-
-      {/* ── Bio ── */}
-      <View style={styles.section}>
-        <View style={styles.bioRow}>
-          {profile?.bio ? (
-            <Text style={styles.bio}>{profile.bio}</Text>
-          ) : (
-            <Text style={styles.bioPlaceholder}>No bio yet — tell people about yourself!</Text>
-          )}
-          <Pressable
-            onPress={() => {
-              setBioText(profile?.bio || '');
-              setBioModalVisible(true);
-            }}
-            style={styles.bioEditButton}
-          >
-            <Text style={styles.bioEditButtonText}>{profile?.bio ? '✎' : '+ Add bio'}</Text>
-          </Pressable>
-        </View>
-      </View>
-
-      {/* ── Bio edit modal ── */}
-      <Modal
-        visible={bioModalVisible}
-        animationType="slide"
-        transparent
-        onRequestClose={() => setBioModalVisible(false)}
-      >
-        <KeyboardAvoidingView
-          style={styles.modalOverlay}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        >
-          <View style={styles.modalSheet}>
-            <Text style={styles.modalTitle}>{profile?.bio ? 'Edit Bio' : 'Add Bio'}</Text>
-            <TextInput
-              style={styles.bioInput}
-              value={bioText}
-              onChangeText={setBioText}
-              placeholder="Write something about yourself…"
-              placeholderTextColor="#aaa"
-              multiline
-              maxLength={300}
-              autoFocus
-            />
-            <Text style={styles.bioCharCount}>{bioText.length}/300</Text>
-            <View style={styles.modalButtons}>
-              <Pressable
-                style={[styles.modalBtn, styles.modalBtnCancel]}
-                onPress={() => setBioModalVisible(false)}
-              >
-                <Text style={styles.modalBtnCancelText}>Cancel</Text>
-              </Pressable>
-              <Pressable
-                style={[styles.modalBtn, styles.modalBtnSave, isSavingBio && styles.modalBtnDisabled]}
-                disabled={isSavingBio}
-                onPress={async () => {
-                  if (!session) return;
-                  setIsSavingBio(true);
-                  try {
-                    await updateBio(session.user.id, bioText.trim(), session.access_token);
-                    setProfile((prev) => prev ? { ...prev, bio: bioText.trim() } : prev);
-                    setBioModalVisible(false);
-                  } catch (err) {
-                    console.error('Failed to save bio:', err);
-                    Alert.alert('Error', 'Could not save bio. Please try again.');
-                  } finally {
-                    setIsSavingBio(false);
-                  }
-                }}
-              >
-                <Text style={styles.modalBtnSaveText}>{isSavingBio ? 'Saving…' : 'Save'}</Text>
-              </Pressable>
-            </View>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
 
       {hasTopRestaurants && (
         <>
@@ -500,16 +496,23 @@ const styles = StyleSheet.create({
     letterSpacing: 0.6,
   },
   bioRow: {
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 8,
+    marginTop: 8,
+    paddingHorizontal: 24,
+    alignSelf: 'stretch',
   },
   bio: {
+    flex: 1,
     fontSize: 14,
     color: '#444',
     lineHeight: 21,
     textAlign: 'center',
   },
   bioPlaceholder: {
+    flex: 1,
     fontSize: 14,
     color: '#bbb',
     lineHeight: 21,
