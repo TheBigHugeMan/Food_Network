@@ -88,3 +88,56 @@ export async function uploadProfileImage(uri: string, userId: string): Promise<{
 
   return response.json();
 }
+
+// ── Profile types ──────────────────────────────────────────────
+
+export interface TasteProfile {
+  bitter: number;
+  umami: number;
+  sour: number;
+  sweet: number;
+  salty: number;
+}
+
+export interface CuisineFrequency {
+  cuisine: string;
+  count: number;
+}
+
+export interface TopRestaurant {
+  id: number | string;
+  name: string;
+  cuisine: string;
+  rating: number;
+  color: string;
+}
+
+export interface UserProfile {
+  id: string;
+  display_name: string;
+  username: string;
+  avatar_url?: string | null;
+  friends_count: number;
+  bio: string;
+  restaurant_visits: number;
+  taste_profile?: TasteProfile;
+  cuisine_frequency?: CuisineFrequency[];
+  top_restaurants?: TopRestaurant[];
+}
+
+export async function getProfile(userId: string, accessToken: string): Promise<UserProfile> {
+  const response = await fetch(`${API_URL}/api/profile/${encodeURIComponent(userId)}`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => null);
+    throw new Error(`Failed to load profile: ${response.status} - ${errorData?.detail ?? response.statusText}`);
+  }
+
+  return response.json();
+}

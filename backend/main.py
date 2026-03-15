@@ -62,6 +62,60 @@ async def upload_profile_image(file: UploadFile = File(...), user_id: str = Form
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
+@app.get("/api/profile/{user_id}")
+async def get_profile(user_id: str):
+    """
+    Return profile data for a given user_id.
+    Extended fields (bio, taste_profile, cuisine_frequency, restaurant_visits,
+    top_restaurants) are stored as JSON in the `preferences` column.
+    """
+    try:
+        result = supabase.table("profiles").select("*").eq("id", user_id).single().execute()
+        row = result.data
+        if not row:
+            raise HTTPException(status_code=404, detail="Profile not found")
+
+        # Parse JSON stored in the `preferences` text column
+        import json as _json
+        prefs: dict = {}
+        if row.get("preferences"):
+            try:
+                prefs = _json.loads(row["preferences"])
+            except (ValueError, TypeError):
+                prefs = {}
+
+        friends_list = row.get("friends") or []
+
+        profile = {
+            "id": row.get("id"),
+            "display_name": row.get("display_name") or "",
+            "username": row.get("username") or "",
+            "avatar_url": row.get("avatar_url"),
+            "friends_count": len(friends_list),
+            # Always-visible fields default to 0 / empty string
+            "bio": prefs.get("bio", ""),
+            "restaurant_visits": prefs.get("restaurant_visits", 0),
+            # Optional fields — omit key entirely when absent so the frontend
+            # can distinguish "not set" from an empty value
+        }
+
+        if prefs.get("taste_profile"):
+            profile["taste_profile"] = prefs["taste_profile"]
+
+        if prefs.get("cuisine_frequency"):
+            profile["cuisine_frequency"] = prefs["cuisine_frequency"]
+
+        if prefs.get("top_restaurants"):
+            profile["top_restaurants"] = prefs["top_restaurants"]
+
+        return profile
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # Allows running the server with `python main.py`
 if __name__ == "__main__":
     import uvicorn

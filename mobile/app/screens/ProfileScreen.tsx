@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,19 +8,36 @@ import {
   StyleSheet,
   Dimensions,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { RadarChart } from '@salmonco/react-native-radar-chart';
 import { useAuth } from '../../lib/auth-context';
-import { uploadProfileImage } from '../../lib/api';
-import mockUser from '../data/mockUser.json';
+import { uploadProfileImage, getProfile, UserProfile } from '../../lib/api';
 
 const SCREEN_W = Dimensions.get('window').width;
 const CARD_W = (SCREEN_W - 48 - 12) / 4; // 4 cards, 16px side padding, 4 gaps of 4
 
 export function ProfileScreen() {
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
-  const { signOut } = useAuth();
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const { session, signOut } = useAuth();
+
+  useEffect(() => {
+    if (!session) return;
+    setIsLoading(true);
+    getProfile(session.user.id, session.access_token)
+      .then((data) => {
+        setProfile(data);
+        if (data.avatar_url) setAvatarUri(data.avatar_url);
+      })
+      .catch((err) => {
+        console.error('Failed to load profile:', err);
+        Alert.alert('Error', 'Could not load profile data.');
+      })
+      .finally(() => setIsLoading(false));
+  }, [session]);
 
   const handleSignOut = () => {
     Alert.alert('Sign out', 'Are you sure you want to sign out?', [
@@ -30,6 +47,7 @@ export function ProfileScreen() {
   };
 
   const pickImage = async () => {
+    if (!session) return;
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
       Alert.alert('Permission needed', 'Allow photo access to change your profile picture.');
@@ -44,11 +62,10 @@ export function ProfileScreen() {
     if (!result.canceled) {
       const uri = result.assets[0].uri;
       setAvatarUri(uri); // Optimistic UI update
-      
       try {
-        // Using a valid UUID format so the database doesn't reject the type
-        const response = await uploadProfileImage(uri, (mockUser as any).id || '00000000-0000-0000-0000-000000000000');
-        setAvatarUri(response.avatar_url); // Switch to the official backend URL
+        const response = await uploadProfileImage(uri, session.user.id);
+        setAvatarUri(response.avatar_url);
+        setProfile((prev) => prev ? { ...prev, avatar_url: response.avatar_url } : prev);
       } catch (error) {
         console.error('Failed to upload image:', error);
         Alert.alert('Upload Error', 'Could not save profile image to the backend.');
@@ -56,15 +73,31 @@ export function ProfileScreen() {
     }
   };
 
-  const maxCuisineCount = Math.max(...mockUser.cuisineFrequency.map((c) => c.count));
+  const hasTasteProfile = !!profile?.taste_profile;
+  const hasCuisineFrequency = !!(profile?.cuisine_frequency && profile.cuisine_frequency.length > 0);
+  const hasTopRestaurants = !!(profile?.top_restaurants && profile.top_restaurants.length > 0);
 
-  const radarData = [
-    { label: 'Bitter', value: mockUser.tasteProfile.bitter },
-    { label: 'Umami',  value: mockUser.tasteProfile.umami  },
-    { label: 'Sour',   value: mockUser.tasteProfile.sour   },
-    { label: 'Sweet',  value: mockUser.tasteProfile.sweet  },
-    { label: 'Salty',  value: mockUser.tasteProfile.salty  },
-  ];
+  const maxCuisineCount = hasCuisineFrequency
+    ? Math.max(...profile!.cuisine_frequency!.map((c) => c.count))
+    : 1;
+
+  const radarData = hasTasteProfile
+    ? [
+        { label: 'Bitter', value: profile!.taste_profile!.bitter },
+        { label: 'Umami',  value: profile!.taste_profile!.umami  },
+        { label: 'Sour',   value: profile!.taste_profile!.sour   },
+        { label: 'Sweet',  value: profile!.taste_profile!.sweet  },
+        { label: 'Salty',  value: profile!.taste_profile!.salty  },
+      ]
+    : [];
+
+  if (isLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#e85d26" />
+      </View>
+    );
+  }
 
   return (
     <ScrollView style={styles.scroll} contentContainerStyle={styles.container}>
@@ -76,102 +109,110 @@ export function ProfileScreen() {
             <Image source={{ uri: avatarUri }} style={styles.avatar} />
           ) : (
             <View style={[styles.avatar, styles.avatarPlaceholder]}>
-              <Text style={styles.avatarInitial}>{mockUser.name[0]}</Text>
+              <Text style={styles.avatarInitial}>
+                {(profile?.display_name || profile?.username || '?')[0].toUpperCase()}
+              </Text>
             </View>
           )}
           <View style={styles.editBadge}>
             <Text style={styles.editBadgeText}>✎</Text>
           </View>
         </Pressable>
-        <Text style={styles.name}>{mockUser.name}</Text>
-        <Text style={styles.username}>{mockUser.username}</Text>
+        <Text style={styles.name}>{profile?.display_name || profile?.username || 'Unknown'}</Text>
+        <Text style={styles.username}>{profile?.username || ''}</Text>
       </View>
 
       {/* ── Stats ── */}
       <View style={styles.statsRow}>
         <View style={styles.statItem}>
-          <Text style={styles.statNumber}>{mockUser.friendsCount}</Text>
+          <Text style={styles.statNumber}>{profile?.friends_count ?? 0}</Text>
           <Text style={styles.statLabel}>Friends</Text>
         </View>
         <View style={styles.statDivider} />
         <View style={styles.statItem}>
-          <Text style={styles.statNumber}>{mockUser.restaurantVisits}</Text>
+          <Text style={styles.statNumber}>{profile?.restaurant_visits ?? 0}</Text>
           <Text style={styles.statLabel}>Visits</Text>
         </View>
       </View>
 
       {/* ── Bio ── */}
       <View style={styles.section}>
-        <Text style={styles.bio}>{mockUser.bio}</Text>
+        <Text style={styles.bio}>{profile?.bio || ''}</Text>
       </View>
 
-      <View style={styles.divider} />
-
-      {/* ── Top 4 Restaurants (Letterboxd-style) ── */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Top Restaurants</Text>
-        <View style={styles.topRow}>
-          {mockUser.topRestaurants.map((r) => (
-            <View key={r.id} style={[styles.restaurantCard, { backgroundColor: r.color }]}>
-              <View style={styles.cardOverlay}>
-                <Text style={styles.cardName} numberOfLines={3}>{r.name}</Text>
-                <Text style={styles.cardCuisine} numberOfLines={1}>{r.cuisine}</Text>
-                <Text style={styles.cardRating}>★ {r.rating.toFixed(1)}</Text>
-              </View>
+      {hasTopRestaurants && (
+        <>
+          <View style={styles.divider} />
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Top Restaurants</Text>
+            <View style={styles.topRow}>
+              {profile!.top_restaurants!.map((r) => (
+                <View key={r.id} style={[styles.restaurantCard, { backgroundColor: r.color }]}>
+                  <View style={styles.cardOverlay}>
+                    <Text style={styles.cardName} numberOfLines={3}>{r.name}</Text>
+                    <Text style={styles.cardCuisine} numberOfLines={1}>{r.cuisine}</Text>
+                    <Text style={styles.cardRating}>★ {r.rating.toFixed(1)}</Text>
+                  </View>
+                </View>
+              ))}
             </View>
-          ))}
-        </View>
-      </View>
+          </View>
+        </>
+      )}
 
-      <View style={styles.divider} />
-
-      {/* ── Taste Profile radar ── */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Taste Profile</Text>
-        <View style={styles.radarWrapper}>
-          <RadarChart
-            data={radarData}
-            maxValue={100}
-            size={SCREEN_W - 64}
-            gradientColor={{
-              startColor: '#FFE8DC',
-              endColor: '#FFCBA4',
-              count: 5,
-            }}
-            stroke={['#FFE0C7', '#FFCBA4', '#FFB377', '#FF9B54', '#e85d26']}
-            strokeWidth={[0.5, 0.5, 0.5, 0.5, 1]}
-            strokeOpacity={[1, 1, 1, 1, 1]}
-            labelColor="#333333"
-            dataFillColor="#e85d26"
-            dataFillOpacity={0.35}
-            dataStroke="#e85d26"
-            dataStrokeWidth={2}
-            divisionStroke="#ddd"
-            divisionStrokeWidth={1}
-          />
-        </View>
-      </View>
-
-      <View style={styles.divider} />
-
-      {/* ── Cuisine frequency bar chart ── */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Favourite Cuisines</Text>
-        {mockUser.cuisineFrequency.map((item) => (
-          <View key={item.cuisine} style={styles.barRow}>
-            <Text style={styles.barLabel}>{item.cuisine}</Text>
-            <View style={styles.barTrack}>
-              <View
-                style={[
-                  styles.barFill,
-                  { width: `${(item.count / maxCuisineCount) * 100}%` },
-                ]}
+      {hasTasteProfile && (
+        <>
+          <View style={styles.divider} />
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Taste Profile</Text>
+            <View style={styles.radarWrapper}>
+              <RadarChart
+                data={radarData}
+                maxValue={100}
+                size={SCREEN_W - 64}
+                gradientColor={{
+                  startColor: '#FFE8DC',
+                  endColor: '#FFCBA4',
+                  count: 5,
+                }}
+                stroke={['#FFE0C7', '#FFCBA4', '#FFB377', '#FF9B54', '#e85d26']}
+                strokeWidth={[0.5, 0.5, 0.5, 0.5, 1]}
+                strokeOpacity={[1, 1, 1, 1, 1]}
+                labelColor="#333333"
+                dataFillColor="#e85d26"
+                dataFillOpacity={0.35}
+                dataStroke="#e85d26"
+                dataStrokeWidth={2}
+                divisionStroke="#ddd"
+                divisionStrokeWidth={1}
               />
             </View>
-            <Text style={styles.barCount}>{item.count}</Text>
           </View>
-        ))}
-      </View>
+        </>
+      )}
+
+      {hasCuisineFrequency && (
+        <>
+          <View style={styles.divider} />
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Favourite Cuisines</Text>
+            {profile!.cuisine_frequency!.map((item) => (
+              <View key={item.cuisine} style={styles.barRow}>
+                <Text style={styles.barLabel}>{item.cuisine}</Text>
+                <View style={styles.barTrack}>
+                  <View
+                    style={[
+                      styles.barFill,
+                      { width: `${(item.count / maxCuisineCount) * 100}%` },
+                    ]}
+                  />
+                </View>
+                <Text style={styles.barCount}>{item.count}</Text>
+              </View>
+            ))}
+          </View>
+        </>
+      )}
 
       <View style={styles.divider} />
 
@@ -194,6 +235,12 @@ export function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
+  loadingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fff',
+  },
   scroll: {
     flex: 1,
     backgroundColor: '#fff',
