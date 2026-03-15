@@ -9,6 +9,11 @@ create table if not exists public.profiles (
   username text,
   display_name text,
   avatar_url text,
+  -- JSON text (optional) used for taste similarity, e.g.:
+  -- {
+  --   "tasteProfile": { "bitter": 42, "umami": 91, "sour": 58, "sweet": 35, "salty": 76 },
+  --   "cuisineFrequency": [{ "cuisine": "Japanese", "count": 41 }]
+  -- }
   preferences text,
   friends uuid[] default '{}',
   created_at timestamptz default now(),
@@ -148,3 +153,34 @@ on conflict (place_id) do nothing;
 update public.restaurants 
 set location = st_setsrid(st_makepoint(longitude, latitude), 4326)::geography
 where latitude is not null and longitude is not null and location is null;
+
+-- ============================================
+-- 5. Optional user-restaurant visits table
+-- ============================================
+create table if not exists public.user_restaurant_visits (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  restaurant_id uuid not null references public.restaurants(id) on delete cascade,
+  created_at timestamptz default now(),
+  unique(user_id, restaurant_id)
+);
+
+create index if not exists user_restaurant_visits_user_idx
+  on public.user_restaurant_visits(user_id);
+
+create index if not exists user_restaurant_visits_restaurant_idx
+  on public.user_restaurant_visits(restaurant_id);
+
+alter table public.user_restaurant_visits enable row level security;
+drop policy if exists "Users can read own visits" on public.user_restaurant_visits;
+create policy "Users can read own visits"
+  on public.user_restaurant_visits for select
+  using (auth.uid() = user_id);
+drop policy if exists "Users can insert own visits" on public.user_restaurant_visits;
+create policy "Users can insert own visits"
+  on public.user_restaurant_visits for insert
+  with check (auth.uid() = user_id);
+drop policy if exists "Users can delete own visits" on public.user_restaurant_visits;
+create policy "Users can delete own visits"
+  on public.user_restaurant_visits for delete
+  using (auth.uid() = user_id);
