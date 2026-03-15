@@ -8,11 +8,11 @@ from pydantic import BaseModel
 
 from db import supabase
 from network_graph import router as network_graph_router
-from restaurants import router as restaurants_router
+from restaurants import router as restaurant_chat_router
 
 load_dotenv()
 from routers.reviews import router as reviews_router
-from routers.restaurants import router as restaurants_router
+from routers.restaurants import router as restaurant_search_router
 
 app = FastAPI()
 
@@ -31,7 +31,8 @@ app.add_middleware(
 app.include_router(network_graph_router)
 # Mount feature routers (avoids merge conflicts; each feature in its own file)
 app.include_router(reviews_router)
-app.include_router(restaurants_router)
+app.include_router(restaurant_chat_router)
+app.include_router(restaurant_search_router)
 
 @app.get("/")
 def read_root():

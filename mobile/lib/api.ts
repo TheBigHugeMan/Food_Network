@@ -3,10 +3,36 @@
  * Set EXPO_PUBLIC_API_URL in .env (e.g. http://localhost:8000 or your Render URL)
  */
 
-// Temporarily hardcode the IP address since the .env file isn't being picked up
-const API_URL = 'http://118.139.22.161:8000';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
+
+// Temporarily keep a manual fallback in case Expo env resolution is unavailable.
+const HARDCODED_API_URL = 'http://118.139.22.161:8000';
+
+function debugLog(
+  hypothesisId: string,
+  location: string,
+  message: string,
+  data: Record<string, unknown>,
+  runId = 'initial'
+) {
+  fetch('http://127.0.0.1:7291/ingest/43621fe5-6367-42d6-8618-9015640fddbf', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Debug-Session-Id': '2d6d23',
+    },
+    body: JSON.stringify({
+      sessionId: '2d6d23',
+      runId,
+      hypothesisId,
+      location,
+      message,
+      data,
+      timestamp: Date.now(),
+    }),
+  }).catch(() => {});
+}
 
 function resolveApiUrl() {
   const envUrlRaw = process.env.EXPO_PUBLIC_API_URL?.trim();
@@ -15,14 +41,16 @@ function resolveApiUrl() {
   const host = hostUri?.split(':')[0];
 
   if (envUrl) {
-    // If env contains localhost, rewrite it for Android emulator/device contexts.
+    // Rewrite loopback URLs so physical devices can reach the backend on the dev machine.
     if (envUrl.includes('localhost') || envUrl.includes('127.0.0.1')) {
-      if (Platform.OS === 'android') {
-        return host ? envUrl.replace('localhost', host).replace('127.0.0.1', host) : 'http://10.0.2.2:8000';
-      }
+      if (host) return envUrl.replace('localhost', host).replace('127.0.0.1', host);
+      if (HARDCODED_API_URL) return HARDCODED_API_URL;
+      if (Platform.OS === 'android') return 'http://10.0.2.2:8000';
     }
     return envUrl;
   }
+
+  if (HARDCODED_API_URL) return HARDCODED_API_URL;
 
   // Fallback: derive from Expo dev host if available.
   if (host) return `http://${host}:8000`;
@@ -34,6 +62,18 @@ function resolveApiUrl() {
 const API_URL = resolveApiUrl();
 
 console.log('Current API_URL is:', API_URL);
+console.log('API resolution inputs:', {
+  envUrl: process.env.EXPO_PUBLIC_API_URL ?? null,
+  hostUri: Constants.expoConfig?.hostUri ?? null,
+  platform: Platform.OS,
+});
+// #region agent log
+debugLog('H4', 'mobile/lib/api.ts:48', 'api module initialized', {
+  apiUrl: API_URL,
+  platform: Platform.OS,
+  hasExpoHost: Boolean(Constants.expoConfig?.hostUri),
+});
+// #endregion
 
 export interface Restaurant {
   place_id: string;
@@ -195,9 +235,34 @@ export async function uploadProfileImage(uri: string, userId: string): Promise<{
 }
 
 export async function getNetworkGraph(accessToken: string): Promise<GraphResponse> {
+  // #region agent log
+  debugLog('H1', 'mobile/lib/api.ts:223', 'getNetworkGraph request start', {
+    apiUrl: API_URL,
+    hasAccessToken: Boolean(accessToken),
+  });
+  // #endregion
   const response = await fetch(`${API_URL}/api/network/graph`, {
     method: 'GET',
     headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  // #region agent log
+  debugLog('H1', 'mobile/lib/api.ts:234', 'getNetworkGraph response received', {
+    ok: response.ok,
+    status: response.status,
+  });
+  // #endregion
+
+  if (!response.ok) {
+    throw new Error(`Network graph failed: ${response.status}`);
+  }
+
+  return response.json();
+}
+
 // ── Profile types ──────────────────────────────────────────────
 
 export interface TasteProfile {
@@ -235,7 +300,15 @@ export interface UserProfile {
 }
 
 export async function getProfile(userId: string, accessToken: string): Promise<UserProfile> {
-  const response = await fetch(`${API_URL}/api/profile/${encodeURIComponent(userId)}`, {
+  // #region agent log
+  debugLog('H2', 'mobile/lib/api.ts:267', 'getProfile request start', {
+    userId,
+    hasAccessToken: Boolean(accessToken),
+  });
+  // #endregion
+  const profileUrl = `${API_URL}/api/profile/${encodeURIComponent(userId)}`;
+  console.log('getProfile request URL:', profileUrl);
+  const response = await fetch(profileUrl, {
     method: 'GET',
     headers: {
       'Content-Type': 'application/json',
@@ -243,12 +316,14 @@ export async function getProfile(userId: string, accessToken: string): Promise<U
     },
   });
 
-  if (!response.ok) {
-    throw new Error(`Network graph failed: ${response.status}`);
-  }
+  // #region agent log
+  debugLog('H2', 'mobile/lib/api.ts:278', 'getProfile response received', {
+    ok: response.ok,
+    status: response.status,
+  });
+  // #endregion
 
-  return response.json();
-}
+  if (!response.ok) {
     const errorData = await response.json().catch(() => null);
     throw new Error(`Failed to load profile: ${response.status} - ${errorData?.detail ?? response.statusText}`);
   }
@@ -342,7 +417,9 @@ export interface Review {
 }
 
 export async function getProfileReviews(userId: string): Promise<Review[]> {
-  const response = await fetch(`${API_URL}/api/reviews/${encodeURIComponent(userId)}`);
+  const reviewsUrl = `${API_URL}/api/reviews/${encodeURIComponent(userId)}`;
+  console.log('getProfileReviews request URL:', reviewsUrl);
+  const response = await fetch(reviewsUrl);
   if (!response.ok) {
     const errorData = await response.json().catch(() => null);
     throw new Error(`Failed to load reviews: ${response.status} - ${errorData?.detail ?? response.statusText}`);
