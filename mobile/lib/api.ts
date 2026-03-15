@@ -3,8 +3,33 @@
  * Set EXPO_PUBLIC_API_URL in .env (e.g. http://localhost:8000 or your Render URL)
  */
 
-// Temporarily hardcode the IP address since the .env file isn't being picked up
-const API_URL = 'http://118.139.16.252:8000';
+import { Platform } from 'react-native';
+import Constants from 'expo-constants';
+
+function resolveApiUrl() {
+  const envUrlRaw = process.env.EXPO_PUBLIC_API_URL?.trim();
+  const envUrl = envUrlRaw?.replace(/\/+$/, '');
+  const hostUri = Constants.expoConfig?.hostUri;
+  const host = hostUri?.split(':')[0];
+
+  if (envUrl) {
+    // If env contains localhost, rewrite it for Android emulator/device contexts.
+    if (envUrl.includes('localhost') || envUrl.includes('127.0.0.1')) {
+      if (Platform.OS === 'android') {
+        return host ? envUrl.replace('localhost', host).replace('127.0.0.1', host) : 'http://10.0.2.2:8000';
+      }
+    }
+    return envUrl;
+  }
+
+  // Fallback: derive from Expo dev host if available.
+  if (host) return `http://${host}:8000`;
+
+  // Last fallback for local emulator/simulator development.
+  return Platform.OS === 'android' ? 'http://10.0.2.2:8000' : 'http://localhost:8000';
+}
+
+const API_URL = resolveApiUrl();
 
 console.log('Current API_URL is:', API_URL);
 
@@ -172,7 +197,12 @@ export interface RestaurantOption {
 }
 
 export async function getRestaurants(): Promise<RestaurantOption[]> {
-  const response = await fetch(`${API_URL}/api/restaurants`);
+  let response: Response;
+  try {
+    response = await fetch(`${API_URL}/api/restaurants`);
+  } catch {
+    throw new Error(`Failed to reach backend at ${API_URL}`);
+  }
   if (!response.ok) throw new Error(`Failed to load restaurants: ${response.status}`);
   return response.json();
 }
@@ -184,7 +214,7 @@ export async function createReview(
   rating: number,
   imageUri: string,
   _accessToken?: string
-): Promise<{ status: string; image_url: string }> {
+): Promise<{ status: string; review: Record<string, unknown> }> {
   const filename = imageUri.split('/').pop();
   const match = /\.(\w+)$/.exec(filename || '');
   const type = match ? `image/${match[1]}` : 'image/jpeg';
@@ -197,10 +227,15 @@ export async function createReview(
   formData.append('description', description);
   formData.append('rating', String(rating));
 
-  const response = await fetch(`${API_URL}/api/reviews`, {
-    method: 'POST',
-    body: formData,
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_URL}/api/reviews`, {
+      method: 'POST',
+      body: formData,
+    });
+  } catch {
+    throw new Error(`Network request failed. Backend unreachable at ${API_URL}`);
+  }
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => null);
@@ -208,4 +243,27 @@ export async function createReview(
     throw new Error(`Review failed: ${response.status} - ${msg}`);
   }
   return response.json();
+}
+
+// ── Reviews ──────────────────────────────────────────────
+
+export interface Review {
+  id: string;
+  description: string;
+  rating: number;
+  image_url: string;
+  created_at: string;
+  restaurant_id: string;
+  restaurant_name: string;
+}
+
+export async function getProfileReviews(userId: string): Promise<Review[]> {
+  const response = await fetch(`${API_URL}/api/reviews/${encodeURIComponent(userId)}`);
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => null);
+    throw new Error(`Failed to load reviews: ${response.status} - ${errorData?.detail ?? response.statusText}`);
+  }
+  const data = await response.json();
+  console.log('getProfileReviews response:', JSON.stringify(data));
+  return data;
 }

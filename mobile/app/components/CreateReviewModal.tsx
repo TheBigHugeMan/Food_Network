@@ -18,6 +18,7 @@ import { getRestaurants, createReview, type RestaurantOption } from '../../lib/a
 type Props = {
   visible: boolean;
   onClose: () => void;
+  onCreated?: () => void;
 };
 
 function StarRatingInput({ value, onChange }: { value: number; onChange: (n: number) => void }) {
@@ -32,7 +33,7 @@ function StarRatingInput({ value, onChange }: { value: number; onChange: (n: num
   );
 }
 
-export function CreateReviewModal({ visible, onClose }: Props) {
+export function CreateReviewModal({ visible, onClose, onCreated }: Props) {
   const { session } = useAuth();
   const [restaurants, setRestaurants] = useState<RestaurantOption[]>([]);
   const [loadingRestaurants, setLoadingRestaurants] = useState(false);
@@ -100,8 +101,8 @@ export function CreateReviewModal({ visible, onClose }: Props) {
     setSubmitting(true);
     try {
       await createReview(profileId, selectedRestaurantId, description, rating, imageUri);
-      Alert.alert('Done', 'Your review was submitted.');
       handleClose();
+      onCreated?.();
     } catch (e: any) {
       console.error(e);
       Alert.alert('Error', e?.message || 'Could not submit review.');

@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -17,7 +18,9 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import { RadarChart } from '@salmonco/react-native-radar-chart';
 import { useAuth } from '../../lib/auth-context';
-import { uploadProfileImage, getProfile, updateBio, UserProfile } from '../../lib/api';
+import { uploadProfileImage, getProfile, updateBio, getProfileReviews, UserProfile, Review } from '../../lib/api';
+import { ReviewCard } from '../components/ReviewCard';
+import { CreateReviewModal } from '../components/CreateReviewModal';
 
 const SCREEN_W = Dimensions.get('window').width;
 const CARD_W = (SCREEN_W - 48 - 12) / 4; // 4 cards, 16px side padding, 4 gaps of 4
@@ -29,22 +32,53 @@ export function ProfileScreen() {
   const [bioModalVisible, setBioModalVisible] = useState(false);
   const [bioText, setBioText] = useState('');
   const [isSavingBio, setIsSavingBio] = useState(false);
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [reviewModalVisible, setReviewModalVisible] = useState(false);
   const { session, signOut } = useAuth();
 
   useEffect(() => {
     if (!session) return;
     setIsLoading(true);
-    getProfile(session.user.id, session.access_token)
-      .then((data) => {
-        setProfile(data);
-        if (data.avatar_url) setAvatarUri(data.avatar_url);
-      })
-      .catch((err) => {
-        console.error('Failed to load profile:', err);
-        Alert.alert('Error', 'Could not load profile data.');
+    // Use allSettled so a failing reviews fetch never blocks the profile from rendering
+    Promise.allSettled([
+      getProfile(session.user.id, session.access_token),
+      getProfileReviews(session.user.id),
+    ])
+      .then(([profileResult, reviewsResult]) => {
+        if (profileResult.status === 'fulfilled') {
+          const data = profileResult.value;
+          setProfile(data);
+          if (data.avatar_url) setAvatarUri(data.avatar_url);
+        } else {
+          console.error('Failed to load profile:', profileResult.reason);
+          Alert.alert('Error', 'Could not load profile data.');
+        }
+        if (reviewsResult.status === 'fulfilled') {
+          setReviews(reviewsResult.value);
+        } else {
+          console.error('Failed to load reviews:', reviewsResult.reason);
+        }
       })
       .finally(() => setIsLoading(false));
   }, [session]);
+
+  const refreshReviews = useCallback(() => {
+    if (!session) return;
+    getProfileReviews(session.user.id)
+      .then((data) => {
+        console.log('Reviews refreshed:', data.length, 'items');
+        setReviews(data);
+      })
+      .catch((err) => console.error('Failed to refresh reviews:', err));
+  }, [session]);
+
+  // Re-fetch reviews every time the Profile tab is focused (handles reviews
+  // created from HomeScreen or anywhere else while the screen was inactive)
+  useFocusEffect(
+    useCallback(() => {
+      refreshReviews();
+    }, [refreshReviews])
+  );
 
   const handleSignOut = () => {
     Alert.alert('Sign out', 'Are you sure you want to sign out?', [
@@ -107,7 +141,8 @@ export function ProfileScreen() {
   }
 
   return (
-    <ScrollView style={styles.scroll} contentContainerStyle={styles.container}>
+    <View style={styles.screenRoot}>
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.container}>
 
       {/* ── Avatar + name ── */}
       <View style={styles.header}>
@@ -140,6 +175,23 @@ export function ProfileScreen() {
           <Text style={styles.statNumber}>{profile?.restaurant_visits ?? 0}</Text>
           <Text style={styles.statLabel}>Visits</Text>
         </View>
+        <View style={styles.statDivider} />
+        <View style={styles.statItem}>
+          <Text style={styles.statNumber}>{reviews.length}</Text>
+          <Text style={styles.statLabel}>Reviews</Text>
+        </View>
+      </View>
+
+      <View style={styles.divider} />
+
+      {/* ── My Reviews ── */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>My Reviews ({reviews.length})</Text>
+        {reviews.length === 0 ? (
+          <Text style={styles.reviewsEmpty}>No reviews yet — tap + to write your first!</Text>
+        ) : (
+          reviews.map((r) => <ReviewCard key={r.id} review={r} />)
+        )}
       </View>
 
       {/* ── Bio ── */}
@@ -308,7 +360,18 @@ export function ProfileScreen() {
         </View>
       </View>
 
-    </ScrollView>
+      </ScrollView>
+
+      <Pressable style={styles.fab} onPress={() => setReviewModalVisible(true)}>
+        <Text style={styles.fabText}>＋</Text>
+      </Pressable>
+
+      <CreateReviewModal
+        visible={reviewModalVisible}
+        onClose={() => setReviewModalVisible(false)}
+        onCreated={() => { setReviewModalVisible(false); refreshReviews(); }}
+      />
+    </View>
   );
 }
 
@@ -323,8 +386,12 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#fff',
   },
+  screenRoot: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
   container: {
-    paddingBottom: 40,
+    paddingBottom: 100,
   },
 
   // Header
@@ -633,5 +700,36 @@ const styles = StyleSheet.create({
     fontSize: 20,
     color: '#ccc',
     lineHeight: 22,
+  },
+  // My Reviews
+  reviewsEmpty: {
+    fontSize: 14,
+    color: '#bbb',
+    textAlign: 'center',
+    paddingVertical: 24,
+    fontStyle: 'italic',
+  },
+  // FAB
+  fab: {
+    position: 'absolute',
+    bottom: 32,
+    right: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#e85d26',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 6,
+  },
+  fabText: {
+    fontSize: 28,
+    color: '#fff',
+    lineHeight: 32,
+    fontWeight: '400',
   },
 });
