@@ -27,7 +27,7 @@ cd food_network
 1. Create a project at [supabase.com](https://supabase.com) (or use an existing one).
 2. Go to **SQL Editor** → **New query**.
 3. Copy the contents of `supabase/schema.sql` and run it.
-4. This creates: `profiles`, `restaurants`, RLS policies, and seeds 2 sample restaurants.
+4. This creates: `profiles`, `restaurants`, `friend_requests`, `reviews`, RLS policies, and seeds 2 sample restaurants. (Friends and reviews require the full schema.)
 
 ### Google Auth (Sign in with Google)
 
