@@ -6,8 +6,8 @@ import {
   TextInput,
   Pressable,
   ScrollView,
-  ActivityIndicator,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { RestaurantCard } from '../components/RestaurantCard';
 import { CreateReviewModal } from '../components/CreateReviewModal';
 
@@ -39,19 +39,17 @@ const MOCK_RECOMMENDATIONS = [
 ];
 
 export function HomeScreen() {
+  const navigation = useNavigation<any>();
   const [query, setQuery] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [results, setResults] = useState<typeof MOCK_RECOMMENDATIONS>([]);
   const [reviewModalVisible, setReviewModalVisible] = useState(false);
 
-  const handleSearch = async () => {
-    setLoading(true);
-    setResults([]);
-    await new Promise((r) => setTimeout(r, 1000));
-    setLoading(false);
+  const handleSearch = () => {
+    const trimmed = query.trim();
+    if (!trimmed) return;
+    navigation.navigate('Search', { initialQuery: trimmed });
   };
 
-  const recommendations = results.length > 0 ? results : MOCK_RECOMMENDATIONS;
+  const recommendations = MOCK_RECOMMENDATIONS;
 
   return (
     <View style={styles.container}>
@@ -61,18 +59,14 @@ export function HomeScreen() {
           placeholder="e.g. spicy Thai near me"
           value={query}
           onChangeText={setQuery}
-          editable={!loading}
+          returnKeyType="search"
+          onSubmitEditing={handleSearch}
         />
         <Pressable
-          style={[styles.searchButton, loading && styles.buttonDisabled]}
+          style={styles.searchButton}
           onPress={handleSearch}
-          disabled={loading}
         >
-          {loading ? (
-            <ActivityIndicator color="#fff" size="small" />
-          ) : (
-            <Text style={styles.searchButtonText}>Search</Text>
-          )}
+          <Text style={styles.searchButtonText}>Search</Text>
         </Pressable>
       </View>
 
@@ -84,27 +78,19 @@ export function HomeScreen() {
       </Pressable>
 
       <ScrollView style={styles.results} showsVerticalScrollIndicator={false}>
-        {loading && (
-          <ActivityIndicator size="large" color="#4285F4" style={styles.loader} />
-        )}
-
-        {!loading && (
-          <>
-            <Text style={styles.sectionLabel}>
-              {results.length > 0 ? 'Search Results' : 'Recommended for You'}
-            </Text>
-            {recommendations.map((r) => (
-              <RestaurantCard
-                key={r.id}
-                name={r.name}
-                cuisine={r.cuisine}
-                rating={r.rating}
-                photo_url={r.photo_url}
-                address={r.address}
-              />
-            ))}
-          </>
-        )}
+        <>
+          <Text style={styles.sectionLabel}>Recommended for You</Text>
+          {recommendations.map((r) => (
+            <RestaurantCard
+              key={r.id}
+              name={r.name}
+              cuisine={r.cuisine}
+              rating={r.rating}
+              photo_url={r.photo_url}
+              address={r.address}
+            />
+          ))}
+        </>
       </ScrollView>
 
       <CreateReviewModal
@@ -154,11 +140,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderRadius: 8,
   },
-  buttonDisabled: { opacity: 0.6 },
   searchButtonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
   results: { flex: 1 },
-  placeholder: { color: '#999', textAlign: 'center', marginTop: 48 },
-  loader: { marginTop: 48 },
   sectionLabel: {
     fontSize: 16,
     fontWeight: '700',

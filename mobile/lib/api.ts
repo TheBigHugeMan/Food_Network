@@ -57,24 +57,29 @@ export interface SearchResponse {
 export async function searchRestaurants(
   query: string,
   accessToken: string,
-  latitude: number,
-  longitude: number
+  latitude?: number,
+  longitude?: number,
+  city?: string,
 ): Promise<SearchResponse> {
+  const body: Record<string, unknown> = { query };
+  if (latitude !== undefined && longitude !== undefined) {
+    body.latitude = latitude;
+    body.longitude = longitude;
+  }
+  if (city) body.city = city;
+
   const response = await fetch(`${API_URL}/api/restaurants/search`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${accessToken}`,
     },
-    body: JSON.stringify({
-      query,
-      latitude,
-      longitude,
-    }),
+    body: JSON.stringify(body),
   });
 
   if (!response.ok) {
-    throw new Error(`Search failed: ${response.status}`);
+    const errorData = await response.json().catch(() => null);
+    throw new Error(`Search failed: ${response.status} – ${errorData?.detail ?? response.statusText}`);
   }
 
   return response.json();

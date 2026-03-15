@@ -27,7 +27,7 @@ cd food_network
 1. Create a project at [supabase.com](https://supabase.com) (or use an existing one).
 2. Go to **SQL Editor** → **New query**.
 3. Copy the contents of `supabase/schema.sql` and run it.
-4. This creates: `profiles`, `restaurants`, RLS policies, and seeds 2 sample restaurants.
+4. This creates: `profiles`, `restaurants`, `friend_requests`, `reviews`, RLS policies, and seeds 2 sample restaurants. (Friends and reviews require the full schema.)
 
 ### Google Auth (Sign in with Google)
 
@@ -94,6 +94,7 @@ Edit `.env` and add:
 |----------|-----------------|
 | `SUPABASE_URL` | Supabase Dashboard → Project Settings → API |
 | `SUPABASE_SERVICE_KEY` | Same place (use **service_role** key, not anon) |
+| `GOOGLE_PLACES_API_KEY` | [Google Cloud Console](https://console.cloud.google.com/apis/credentials) → Create API key → Enable **Places API** |
 | `GEMINI_API_KEY` | Google AI Studio |
 | `FRONTEND_URL` | `http://localhost:8081` for dev |
 
@@ -127,4 +128,4 @@ uvicorn main:app --reload --host 0.0.0.0 --port 8000
 
 **Mobile** (`mobile/.env`): `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`, `EXPO_PUBLIC_API_URL`
 
-**Backend** (`backend/.env`): `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `GEMINI_API_KEY`, `FRONTEND_URL`
+**Backend** (`backend/.env`): `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `GOOGLE_PLACES_API_KEY`, `GEMINI_API_KEY`, `FRONTEND_URL`
