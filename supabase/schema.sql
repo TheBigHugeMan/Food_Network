@@ -148,3 +148,26 @@ on conflict (place_id) do nothing;
 update public.restaurants 
 set location = st_setsrid(st_makepoint(longitude, latitude), 4326)::geography
 where latitude is not null and longitude is not null and location is null;
+
+-- ============================================
+-- 5. Reviews table
+-- ============================================
+drop table if exists public.reviews;
+
+create table public.reviews (
+  id            uuid primary key default gen_random_uuid(),
+  profile_id    uuid not null references public.profiles(id) on delete cascade,
+  restaurant_id uuid not null references public.restaurants(id) on delete cascade,
+  description   text default '',
+  rating        int not null check (rating between 1 and 5),
+  image_url     text,
+  created_at    timestamptz default now()
+);
+
+-- Index for fast per-user lookup
+create index reviews_profile_id_idx on public.reviews(profile_id);
+
+-- RLS (service role bypasses, but good practice)
+alter table public.reviews enable row level security;
+create policy "Service role full access" on public.reviews
+  using (true) with check (true);

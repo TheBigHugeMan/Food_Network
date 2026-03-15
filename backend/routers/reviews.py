@@ -20,6 +20,33 @@ def list_restaurants():
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/reviews/{profile_id}")
+def get_profile_reviews(profile_id: str):
+    """Return all reviews for a given profile, joined with restaurant name, newest first."""
+    try:
+        res = (
+            supabase.table("reviews")
+            .select("id, description, rating, image_url, created_at, restaurant_id, restaurants(name)")
+            .eq("profile_id", profile_id)
+            .order("created_at", desc=True)
+            .execute()
+        )
+        reviews = []
+        for row in res.data:
+            restaurant_info = row.pop("restaurants", None)
+            restaurant_name = "Unknown"
+            if isinstance(restaurant_info, dict):
+                restaurant_name = restaurant_info.get("name", "Unknown")
+            elif isinstance(restaurant_info, list) and len(restaurant_info) > 0:
+                first = restaurant_info[0] if isinstance(restaurant_info[0], dict) else None
+                restaurant_name = first.get("name", "Unknown") if first else "Unknown"
+            row["restaurant_name"] = restaurant_name
+            reviews.append(row)
+        return reviews
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.post("/reviews")
 async def create_review(
     profile_id: str = Form(...),
@@ -43,7 +70,7 @@ async def create_review(
         )
         image_url = supabase.storage.from_("review-images").get_public_url(file_path)
 
-        supabase.table("reviews").insert({
+        inserted = supabase.table("reviews").insert({
             "profile_id": profile_id,
             "restaurant_id": restaurant_id,
             "description": description,
@@ -51,6 +78,7 @@ async def create_review(
             "image_url": image_url,
         }).execute()
 
-        return {"status": "ok", "image_url": image_url}
+        review = inserted.data[0] if inserted.data else {}
+        return {"status": "ok", "review": review}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
