@@ -9,11 +9,15 @@ import {
   Dimensions,
   Alert,
   ActivityIndicator,
+  Modal,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { RadarChart } from '@salmonco/react-native-radar-chart';
 import { useAuth } from '../../lib/auth-context';
-import { uploadProfileImage, getProfile, UserProfile } from '../../lib/api';
+import { uploadProfileImage, getProfile, updateBio, UserProfile } from '../../lib/api';
 
 const SCREEN_W = Dimensions.get('window').width;
 const CARD_W = (SCREEN_W - 48 - 12) / 4; // 4 cards, 16px side padding, 4 gaps of 4
@@ -22,6 +26,9 @@ export function ProfileScreen() {
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [bioModalVisible, setBioModalVisible] = useState(false);
+  const [bioText, setBioText] = useState('');
+  const [isSavingBio, setIsSavingBio] = useState(false);
   const { session, signOut } = useAuth();
 
   useEffect(() => {
@@ -137,8 +144,79 @@ export function ProfileScreen() {
 
       {/* ── Bio ── */}
       <View style={styles.section}>
-        <Text style={styles.bio}>{profile?.bio || ''}</Text>
+        <View style={styles.bioRow}>
+          {profile?.bio ? (
+            <Text style={styles.bio}>{profile.bio}</Text>
+          ) : (
+            <Text style={styles.bioPlaceholder}>No bio yet — tell people about yourself!</Text>
+          )}
+          <Pressable
+            onPress={() => {
+              setBioText(profile?.bio || '');
+              setBioModalVisible(true);
+            }}
+            style={styles.bioEditButton}
+          >
+            <Text style={styles.bioEditButtonText}>{profile?.bio ? '✎' : '+ Add bio'}</Text>
+          </Pressable>
+        </View>
       </View>
+
+      {/* ── Bio edit modal ── */}
+      <Modal
+        visible={bioModalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setBioModalVisible(false)}
+      >
+        <KeyboardAvoidingView
+          style={styles.modalOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          <View style={styles.modalSheet}>
+            <Text style={styles.modalTitle}>{profile?.bio ? 'Edit Bio' : 'Add Bio'}</Text>
+            <TextInput
+              style={styles.bioInput}
+              value={bioText}
+              onChangeText={setBioText}
+              placeholder="Write something about yourself…"
+              placeholderTextColor="#aaa"
+              multiline
+              maxLength={300}
+              autoFocus
+            />
+            <Text style={styles.bioCharCount}>{bioText.length}/300</Text>
+            <View style={styles.modalButtons}>
+              <Pressable
+                style={[styles.modalBtn, styles.modalBtnCancel]}
+                onPress={() => setBioModalVisible(false)}
+              >
+                <Text style={styles.modalBtnCancelText}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.modalBtn, styles.modalBtnSave, isSavingBio && styles.modalBtnDisabled]}
+                disabled={isSavingBio}
+                onPress={async () => {
+                  if (!session) return;
+                  setIsSavingBio(true);
+                  try {
+                    await updateBio(session.user.id, bioText.trim(), session.access_token);
+                    setProfile((prev) => prev ? { ...prev, bio: bioText.trim() } : prev);
+                    setBioModalVisible(false);
+                  } catch (err) {
+                    console.error('Failed to save bio:', err);
+                    Alert.alert('Error', 'Could not save bio. Please try again.');
+                  } finally {
+                    setIsSavingBio(false);
+                  }
+                }}
+              >
+                <Text style={styles.modalBtnSaveText}>{isSavingBio ? 'Saving…' : 'Save'}</Text>
+              </Pressable>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
 
       {hasTopRestaurants && (
         <>
@@ -354,11 +432,100 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.6,
   },
+  bioRow: {
+    alignItems: 'center',
+    gap: 8,
+  },
   bio: {
     fontSize: 14,
     color: '#444',
     lineHeight: 21,
     textAlign: 'center',
+  },
+  bioPlaceholder: {
+    fontSize: 14,
+    color: '#bbb',
+    lineHeight: 21,
+    textAlign: 'center',
+    fontStyle: 'italic',
+  },
+  bioEditButton: {
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e85d26',
+  },
+  bioEditButtonText: {
+    fontSize: 12,
+    color: '#e85d26',
+    fontWeight: '600',
+  },
+  // Bio modal
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.4)',
+  },
+  modalSheet: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 24,
+    paddingBottom: 36,
+  },
+  modalTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#1a1a1a',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  bioInput: {
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    borderRadius: 10,
+    padding: 12,
+    fontSize: 14,
+    color: '#1a1a1a',
+    minHeight: 100,
+    textAlignVertical: 'top',
+  },
+  bioCharCount: {
+    fontSize: 11,
+    color: '#aaa',
+    textAlign: 'right',
+    marginTop: 4,
+    marginBottom: 16,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  modalBtn: {
+    flex: 1,
+    paddingVertical: 13,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  modalBtnCancel: {
+    backgroundColor: '#f5f5f5',
+  },
+  modalBtnCancelText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#555',
+  },
+  modalBtnSave: {
+    backgroundColor: '#e85d26',
+  },
+  modalBtnSaveText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  modalBtnDisabled: {
+    opacity: 0.6,
   },
   divider: {
     height: 1,

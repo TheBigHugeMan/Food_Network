@@ -116,6 +116,41 @@ async def get_profile(user_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+class BioUpdate(BaseModel):
+    bio: str
+
+
+@app.patch("/api/profile/{user_id}/bio")
+async def update_bio(user_id: str, body: BioUpdate):
+    """
+    Update (or set) the bio field inside the `preferences` JSON column.
+    All other preference fields are preserved.
+    """
+    import json as _json
+    try:
+        result = supabase.table("profiles").select("preferences").eq("id", user_id).single().execute()
+        row = result.data
+        if not row:
+            raise HTTPException(status_code=404, detail="Profile not found")
+
+        prefs: dict = {}
+        if row.get("preferences"):
+            try:
+                prefs = _json.loads(row["preferences"])
+            except (ValueError, TypeError):
+                prefs = {}
+
+        prefs["bio"] = body.bio
+
+        supabase.table("profiles").update({"preferences": _json.dumps(prefs)}).eq("id", user_id).execute()
+
+        return {"bio": body.bio}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # Allows running the server with `python main.py`
 if __name__ == "__main__":
     import uvicorn

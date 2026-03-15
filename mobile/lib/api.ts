@@ -141,3 +141,21 @@ export async function getProfile(userId: string, accessToken: string): Promise<U
 
   return response.json();
 }
+
+export async function updateBio(userId: string, bio: string, accessToken: string): Promise<{ bio: string }> {
+  const response = await fetch(`${API_URL}/api/profile/${encodeURIComponent(userId)}/bio`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({ bio }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => null);
+    throw new Error(`Failed to update bio: ${response.status} - ${errorData?.detail ?? response.statusText}`);
+  }
+
+  return response.json();
+}
