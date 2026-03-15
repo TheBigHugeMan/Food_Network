@@ -76,6 +76,24 @@ alter table public.restaurants
 create index if not exists restaurants_location_idx 
   on public.restaurants using gist(location);
 
+-- Auto-update the PostGIS location column whenever latitude/longitude change.
+-- This means backend upserts from Google Places automatically keep the
+-- geography column in sync without any extra RPC calls.
+create or replace function public.sync_restaurant_location()
+returns trigger as $$
+begin
+  if new.latitude is not null and new.longitude is not null then
+    new.location = st_setsrid(st_makepoint(new.longitude, new.latitude), 4326)::geography;
+  end if;
+  return new;
+end;
+$$ language plpgsql;
+
+drop trigger if exists sync_restaurant_location_trigger on public.restaurants;
+create trigger sync_restaurant_location_trigger
+  before insert or update of latitude, longitude on public.restaurants
+  for each row execute function public.sync_restaurant_location();
+
 -- RLS: public read for now
 alter table public.restaurants enable row level security;
 drop policy if exists "Anyone can read restaurants" on public.restaurants;
