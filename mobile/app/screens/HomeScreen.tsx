@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { RestaurantCard } from '../components/RestaurantCard';
+import { CreateReviewModal } from '../components/CreateReviewModal';
 
 const MOCK_RECOMMENDATIONS = [
   {
@@ -41,6 +42,7 @@ export function HomeScreen() {
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<typeof MOCK_RECOMMENDATIONS>([]);
+  const [reviewModalVisible, setReviewModalVisible] = useState(false);
 
   const handleSearch = async () => {
     setLoading(true);
@@ -74,6 +76,13 @@ export function HomeScreen() {
         </Pressable>
       </View>
 
+      <Pressable
+        style={styles.createReviewButton}
+        onPress={() => setReviewModalVisible(true)}
+      >
+        <Text style={styles.createReviewButtonText}>Create Review</Text>
+      </Pressable>
+
       <ScrollView style={styles.results} showsVerticalScrollIndicator={false}>
         {loading && (
           <ActivityIndicator size="large" color="#4285F4" style={styles.loader} />
@@ -97,6 +106,11 @@ export function HomeScreen() {
           </>
         )}
       </ScrollView>
+
+      <CreateReviewModal
+        visible={reviewModalVisible}
+        onClose={() => setReviewModalVisible(false)}
+      />
     </View>
   );
 }
@@ -110,7 +124,20 @@ const styles = StyleSheet.create({
   searchBar: {
     flexDirection: 'row',
     gap: 8,
+    marginBottom: 12,
+  },
+  createReviewButton: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#e85d26',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
     marginBottom: 16,
+  },
+  createReviewButtonText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '600',
   },
   input: {
     flex: 1,
