@@ -67,8 +67,8 @@ async def upload_profile_image(file: UploadFile = File(...), user_id: str = Form
 async def get_profile(user_id: str):
     """
     Return profile data for a given user_id.
-    Extended fields (bio, taste_profile, cuisine_frequency, restaurant_visits,
-    top_restaurants) are stored as JSON in the `preferences` column.
+    Bio is stored in the `bio` column. Other extended fields are stored as
+    JSON in the `preferences` column.
     """
     try:
         result = supabase.table("profiles").select("*").eq("id", user_id).single().execute()
@@ -94,7 +94,7 @@ async def get_profile(user_id: str):
             "avatar_url": row.get("avatar_url"),
             "friends_count": len(friends_list),
             # Always-visible fields default to 0 / empty string
-            "bio": prefs.get("bio", ""),
+            "bio": row.get("bio") or "",
             "restaurant_visits": prefs.get("restaurant_visits", 0),
             # Optional fields — omit key entirely when absent so the frontend
             # can distinguish "not set" from an empty value
@@ -123,26 +123,15 @@ class BioUpdate(BaseModel):
 @app.patch("/api/profile/{user_id}/bio")
 async def update_bio(user_id: str, body: BioUpdate):
     """
-    Update (or set) the bio field inside the `preferences` JSON column.
-    All other preference fields are preserved.
+    Update (or set) the bio field in the `profiles.bio` column.
     """
-    import json as _json
     try:
-        result = supabase.table("profiles").select("preferences").eq("id", user_id).single().execute()
+        result = supabase.table("profiles").select("bio").eq("id", user_id).single().execute()
         row = result.data
         if not row:
             raise HTTPException(status_code=404, detail="Profile not found")
 
-        prefs: dict = {}
-        if row.get("preferences"):
-            try:
-                prefs = _json.loads(row["preferences"])
-            except (ValueError, TypeError):
-                prefs = {}
-
-        prefs["bio"] = body.bio
-
-        supabase.table("profiles").update({"preferences": _json.dumps(prefs)}).eq("id", user_id).execute()
+        supabase.table("profiles").update({"bio": body.bio}).eq("id", user_id).execute()
 
         return {"bio": body.bio}
     except HTTPException:
