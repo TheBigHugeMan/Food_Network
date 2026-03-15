@@ -141,7 +141,7 @@ class RestaurantSearchRequest(BaseModel):
     query: str
     latitude: Optional[float] = None
     longitude: Optional[float] = None
-    city: Optional[str] = None  # Fallback when device coords are unavailable
+    suburb: Optional[str] = None  # Fallback when device coords are unavailable
 
 
 # ── Endpoint ───────────────────────────────────────────────────────────────────
@@ -168,10 +168,11 @@ async def search_restaurants(
 
     has_coords = body.latitude is not None and body.longitude is not None
 
-    # Build the text query. When only a city is given, embed it so Places
-    # Text Search biases results to that locality even without lat/lng.
-    if body.city and not has_coords:
-        search_text = f"{query} restaurant in {body.city.strip()}"
+    # Always embed the suburb in the query text when available – this gives
+    # Google Places a strong locality signal regardless of whether coords are
+    # also present (coords alone are only a soft bias).
+    if body.suburb:
+        search_text = f"{query} restaurant in {body.suburb.strip()}"
     else:
         search_text = f"{query} restaurant"
 
@@ -185,7 +186,7 @@ async def search_restaurants(
     if has_coords:
         # location + radius provides a soft location bias (not strict bounding)
         params["location"] = f"{body.latitude},{body.longitude}"
-        params["radius"] = 10000  # 10 km bias
+        params["radius"] = 3000  # 3 km bias
 
     async with httpx.AsyncClient(timeout=10.0) as client:
         resp = await client.get(_TEXT_SEARCH_URL, params=params)

@@ -17,7 +17,7 @@ import { RestaurantCard } from '../components/RestaurantCard';
 
 type LocationState =
   | { status: 'pending' }
-  | { status: 'granted'; latitude: number; longitude: number }
+  | { status: 'granted'; latitude: number; longitude: number; suburb?: string }
   | { status: 'denied' };
 
 export function SearchScreen() {
@@ -28,7 +28,7 @@ export function SearchScreen() {
   const initialQuery: string = route.params?.initialQuery ?? '';
 
   const [query, setQuery] = useState(initialQuery);
-  const [city, setCity] = useState('');
+  const [suburb, setSuburb] = useState('');
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<Restaurant[]>([]);
   const [searched, setSearched] = useState(false);
@@ -51,11 +51,22 @@ export function SearchScreen() {
         const pos = await Location.getCurrentPositionAsync({
           accuracy: Location.Accuracy.Balanced,
         });
+        let detectedSuburb: string | undefined;
+        try {
+          const [geo] = await Location.reverseGeocodeAsync({
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude,
+          });
+          detectedSuburb = geo?.district ?? geo?.subregion ?? geo?.city ?? undefined;
+        } catch {
+          // reverse geocode failure is non-fatal
+        }
         if (!cancelled)
           setLocationState({
             status: 'granted',
             latitude: pos.coords.latitude,
             longitude: pos.coords.longitude,
+            suburb: detectedSuburb,
           });
       } catch {
         if (!cancelled) setLocationState({ status: 'denied' });
@@ -85,11 +96,11 @@ export function SearchScreen() {
       return;
     }
 
-    const needsCity = loc.status !== 'granted';
-    if (needsCity && !city.trim()) {
+    const needsSuburb = loc.status !== 'granted';
+    if (needsSuburb && !suburb.trim()) {
       Alert.alert(
         'Location needed',
-        'Enter your city or suburb so we can find nearby restaurants.',
+        'Enter your suburb so we can find nearby restaurants.',
       );
       return;
     }
@@ -107,12 +118,15 @@ export function SearchScreen() {
 
     try {
       const hasCoords = loc.status === 'granted';
+      const resolvedSuburb = hasCoords
+        ? (loc as any).suburb
+        : suburb.trim() || undefined;
       const response = await searchRestaurants(
         trimmedQuery,
         accessToken,
         hasCoords ? (loc as any).latitude : undefined,
         hasCoords ? (loc as any).longitude : undefined,
-        hasCoords ? undefined : city.trim(),
+        resolvedSuburb,
       );
       setResults(response.top_restaurants);
     } catch (e: any) {
@@ -126,15 +140,15 @@ export function SearchScreen() {
 
   return (
     <View style={styles.container}>
-      {/* City/suburb input – shown when device location is unavailable */}
+      {/* Suburb input – shown when device location is unavailable */}
       {locationState.status === 'denied' && (
         <View style={styles.locationRow}>
-          <Text style={styles.locationLabel}>Your city or suburb</Text>
+          <Text style={styles.locationLabel}>Your suburb</Text>
           <TextInput
             style={styles.locationInput}
-            placeholder="e.g. Melbourne CBD"
-            value={city}
-            onChangeText={setCity}
+            placeholder="e.g. Fitzroy"
+            value={suburb}
+            onChangeText={setSuburb}
             returnKeyType="done"
           />
         </View>

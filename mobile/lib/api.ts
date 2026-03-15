@@ -34,14 +34,14 @@ export async function searchRestaurants(
   accessToken: string,
   latitude?: number,
   longitude?: number,
-  city?: string,
+  suburb?: string,
 ): Promise<SearchResponse> {
   const body: Record<string, unknown> = { query };
   if (latitude !== undefined && longitude !== undefined) {
     body.latitude = latitude;
     body.longitude = longitude;
   }
-  if (city) body.city = city;
+  if (suburb) body.suburb = suburb;
 
   const response = await fetch(`${API_URL}/api/restaurants/search`, {
     method: 'POST',
