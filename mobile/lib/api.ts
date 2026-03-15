@@ -4,7 +4,7 @@
  */
 
 // Temporarily hardcode the IP address since the .env file isn't being picked up
-const API_URL = 'http://192.168.0.11:8000';
+const API_URL = 'http://118.139.16.252:8000';
 
 console.log('Current API_URL is:', API_URL);
 

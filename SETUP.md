@@ -98,7 +98,7 @@ Edit `.env` and add:
 | `FRONTEND_URL` | `http://localhost:8081` for dev |
 
 ```bash
-uvicorn main:app --reload --port 8000
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 ---
