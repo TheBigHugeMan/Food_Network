@@ -1,7 +1,9 @@
+"""
+Shared Supabase client. Used by main.py and by routers (e.g. reviews).
+"""
 import os
-
 from dotenv import load_dotenv
-from supabase import Client, create_client
+from supabase import create_client, Client
 
 load_dotenv()
 
