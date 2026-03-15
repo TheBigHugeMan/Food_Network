@@ -30,6 +30,7 @@ type SocialGraphProps = {
   nodes: GraphNode[];
   edges: GraphEdge[];
   centerNodeId: string;
+  isScrolling?: boolean;
 };
 
 function clamp(value: number, min: number, max: number) {
@@ -71,25 +72,33 @@ function buildCurvedPath(
 const TWO_PI = 2 * Math.PI;
 const PHASE_INCREMENT = 0.004;
 
-export function SocialGraph({ nodes, edges, centerNodeId }: SocialGraphProps) {
-  const { width } = useWindowDimensions();
+const GRAPH_HEIGHT_MIN = 320;
+const GRAPH_HEIGHT_MAX = 520;
+const GRAPH_HEIGHT_FRACTION = 0.42;
+
+export function SocialGraph({ nodes, edges, centerNodeId, isScrolling = false }: SocialGraphProps) {
+  const { width, height } = useWindowDimensions();
   const [selection, setSelection] = useState<Selection>(null);
   const [phase, setPhase] = useState(0);
 
   useEffect(() => {
     let rafId: number;
     const tick = () => {
-      if (selection === null) {
+      if (selection === null && !isScrolling) {
         setPhase((p) => (p + PHASE_INCREMENT) % TWO_PI);
       }
       rafId = requestAnimationFrame(tick);
     };
     rafId = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(rafId);
-  }, [selection]);
+  }, [selection, isScrolling]);
 
   const canvasWidth = Math.max(320, width - 24);
-  const canvasHeight = 560;
+  const canvasHeight = clamp(
+    Math.round(height * GRAPH_HEIGHT_FRACTION),
+    GRAPH_HEIGHT_MIN,
+    GRAPH_HEIGHT_MAX
+  );
   const centerX = canvasWidth / 2;
   const centerY = canvasHeight / 2 - 12;
   const nodeRadius = 34;

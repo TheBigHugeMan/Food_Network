@@ -5,14 +5,127 @@ API key is read from env (GEMINI_API_KEY) and never exposed to the client.
 import json
 import os
 import re
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Set
 
 from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel, Field
 
 from auth import extract_token, get_user_id_from_token
+from db import supabase
+from network_graph import (
+    _extract_cuisine_weights,
+    _extract_taste_profile,
+    _parse_preferences,
+)
 
 router = APIRouter()
+
+
+# --- @mention and group preferences ---
+
+def _extract_mentions(message: str) -> List[str]:
+    """Extract @Name tokens from the message (e.g. @Sarah, @Maya Chen)."""
+    return re.findall(r"@(\w+(?:\s\w+)?)", message)
+
+
+def _resolve_mentions_to_group(
+    user_id: str, message: str
+) -> List[Tuple[str, Dict[str, Any]]]:
+    """
+    Resolve @mentions in message to (name, preferences) for user + matched friends.
+    Returns list of (display_name, preferences_dict). User first, then friends in mention order.
+    """
+    mentions = _extract_mentions(message)
+    if not mentions:
+        return []
+
+    profile_result = (
+        supabase.table("profiles")
+        .select("id,display_name,preferences,friends")
+        .eq("id", user_id)
+        .execute()
+    )
+    profile_rows = profile_result.data or []
+    profile = profile_rows[0] if profile_rows else None
+    if not profile:
+        return []
+
+    raw_friends = profile.get("friends") or []
+    friend_ids = [str(fid) for fid in raw_friends if str(fid) != user_id]
+    friend_ids = list(dict.fromkeys(friend_ids))
+    if not friend_ids:
+        return []
+
+    friends_result = (
+        supabase.table("profiles")
+        .select("id,display_name,preferences")
+        .in_("id", friend_ids)
+        .execute()
+    )
+    friend_profiles = friends_result.data or []
+
+    # Build display_name -> (id, preferences) for friends
+    friend_by_name: Dict[str, Dict[str, Any]] = {}
+    for f in friend_profiles:
+        display_name = (f.get("display_name") or "").strip()
+        if display_name:
+            friend_by_name[display_name.lower()] = {
+                "id": str(f.get("id")),
+                "display_name": display_name,
+                "preferences": _parse_preferences(f.get("preferences")),
+            }
+
+    # Match each mention to a friend (case-insensitive); first match wins per name
+    seen_ids: Set[str] = set()
+    group: List[Tuple[str, Dict[str, Any]]] = []
+
+    # Add user first
+    user_prefs = _parse_preferences(profile.get("preferences"))
+    user_name = (profile.get("display_name") or "You").strip() or "You"
+    group.append((user_name, user_prefs))
+    seen_ids.add(user_id)
+
+    for mention in mentions:
+        mention_clean = mention.strip().lower()
+        if not mention_clean:
+            continue
+        for friend_display_lower, data in friend_by_name.items():
+            if friend_display_lower == mention_clean:
+                fid = data["id"]
+                if fid not in seen_ids:
+                    seen_ids.add(fid)
+                    group.append((data["display_name"], data["preferences"]))
+                break
+
+    return group
+
+
+def _build_group_summary(group: List[Tuple[str, Dict[str, Any]]]) -> str:
+    """Build a short plaintext summary of group preferences for the Gemini prompt."""
+    if not group:
+        return ""
+    parts = []
+    for name, prefs in group:
+        cuisines = _extract_cuisine_weights(prefs)
+        taste = _extract_taste_profile(prefs)
+        top_cuisines = sorted(cuisines.items(), key=lambda x: -x[1])[:3]
+        top_taste = sorted(taste.items(), key=lambda x: -x[1])[:2]
+        if not top_cuisines and not top_taste:
+            parts.append(f"{name} (no preferences set)")
+        else:
+            c_str = ", ".join(c.title() for c, _ in top_cuisines) if top_cuisines else ""
+            t_str = ", ".join(t for t, _ in top_taste) if top_taste else ""
+            bits = []
+            if c_str:
+                bits.append(f"loves {c_str}")
+            if t_str:
+                bits.append(f"high {t_str}")
+            parts.append(f"{name} ({'; '.join(bits)})")
+    return (
+        "Group dining with: "
+        + " and ".join(parts)
+        + ". Please recommend restaurants that work well for everyone in the group."
+    )
 
 
 # --- Pydantic models for chat ---
@@ -64,16 +177,24 @@ def _get_gemini_client():
     return genai
 
 
-def _build_system_prompt(latitude: Optional[float], longitude: Optional[float]) -> str:
+def _build_system_prompt(
+    latitude: Optional[float],
+    longitude: Optional[float],
+    group_summary: Optional[str] = None,
+) -> str:
     location_note = ""
     if latitude is not None and longitude is not None:
         location_note = f" The user's approximate location is latitude {latitude}, longitude {longitude}. Prefer recommending places that could be near them when they ask for 'near me' or local suggestions."
+    group_note = ""
+    if group_summary and group_summary.strip():
+        group_note = f" {group_summary.strip()}"
     return (
         "You are a friendly restaurant recommendation assistant. "
         "Answer concisely and helpfully. "
         "When the user asks for restaurant suggestions, provide a short conversational reply and, when relevant, a JSON array of 1-5 recommended restaurants. "
         "Each restaurant must have: name (string), address (string or null), cuisine (string or null), rating (number 0-5 or null), reasoning (short reason for this pick or null). "
         + location_note
+        + group_note
         + "\n\n"
         "You must respond with exactly two parts separated by the delimiter ---JSON--- on its own line. "
         "Part 1: your conversational reply (plain text, no markdown). "
@@ -114,12 +235,13 @@ def _call_gemini(
     history: List[ChatMessage],
     latitude: Optional[float],
     longitude: Optional[float],
+    group_summary: Optional[str] = None,
 ) -> RestaurantChatResponse:
     """Call Gemini and return a normalized RestaurantChatResponse."""
     genai = _get_gemini_client()
     model = genai.GenerativeModel("gemini-2.5-flash")
 
-    system_prompt = _build_system_prompt(latitude, longitude)
+    system_prompt = _build_system_prompt(latitude, longitude, group_summary)
     parts = [system_prompt, "\n\nConversation:\n"]
     for msg in history[-10:]:  # cap history
         parts.append(f"{msg.role}: {msg.content}\n")
@@ -174,11 +296,18 @@ def restaurant_chat(
 ):
     """Authenticated endpoint: send a message and get a Gemini-powered reply with optional restaurant list."""
     token = extract_token(authorization)
-    get_user_id_from_token(token)  # ensure authenticated
+    user_id = get_user_id_from_token(token)
+
+    message = body.message.strip()
+    group_summary = None
+    group = _resolve_mentions_to_group(user_id, message)
+    if group:
+        group_summary = _build_group_summary(group)
 
     return _call_gemini(
-        user_message=body.message.strip(),
+        user_message=message,
         history=body.history,
         latitude=body.latitude,
         longitude=body.longitude,
+        group_summary=group_summary,
     )

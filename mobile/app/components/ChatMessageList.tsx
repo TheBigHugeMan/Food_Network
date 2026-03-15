@@ -83,8 +83,8 @@ export function ChatMessageList({
 
 const styles = StyleSheet.create({
   emptyWrap: {
-    paddingVertical: 20,
-    paddingHorizontal: 4,
+    paddingVertical: 24,
+    paddingHorizontal: 8,
   },
   emptyText: {
     fontSize: 14,
@@ -115,12 +115,12 @@ const styles = StyleSheet.create({
   },
   list: {
     flex: 1,
-    maxHeight: 280,
+    minHeight: 240,
   },
   listContent: {
-    paddingVertical: 8,
-    paddingHorizontal: 0,
-    paddingBottom: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 4,
+    paddingBottom: 24,
   },
   bubbleWrap: {
     marginBottom: 10,
@@ -133,9 +133,9 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   bubble: {
-    maxWidth: '88%',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    maxWidth: '92%',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     borderRadius: 16,
   },
   userBubble: {
@@ -148,7 +148,7 @@ const styles = StyleSheet.create({
   },
   bubbleText: {
     fontSize: 15,
-    lineHeight: 22,
+    lineHeight: 23,
   },
   userText: {
     color: '#fff',

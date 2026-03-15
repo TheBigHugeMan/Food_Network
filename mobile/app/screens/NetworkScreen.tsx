@@ -1,12 +1,35 @@
-import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { DEMO_GRAPH } from '../data/demoGraph';
 import { SocialGraph } from '../components/SocialGraph';
 import { NetworkChatSection } from '../components/NetworkChatSection';
-import { type GraphResponse, getNetworkGraph } from '../../lib/api';
+import { ChatComposer } from '../components/ChatComposer';
+import {
+  type GraphResponse,
+  getNetworkGraph,
+  sendRestaurantChatMessage,
+  type RestaurantRecommendation,
+} from '../../lib/api';
 import { useAuth } from '../../lib/auth-context';
+import type { ChatMessage as ChatMessageWithRestaurants } from '../components/ChatMessageList';
 
 type DataSource = 'demo' | 'real';
+
+const SUGGESTION_CHIPS = [
+  'Best sushi near me',
+  'Date night spot',
+  'Quick lunch downtown',
+  'Cozy café for brunch',
+];
 
 function getCenterNodeId(graph: GraphResponse, fallbackUserId: string) {
   const explicitSelf = graph.nodes.find((node) => node.isSelf);
@@ -21,6 +44,14 @@ export function NetworkScreen() {
   const [loading, setLoading] = useState(true);
   const [source, setSource] = useState<DataSource>('demo');
   const [graph, setGraph] = useState<GraphResponse>(DEMO_GRAPH);
+  const [isScrolling, setIsScrolling] = useState(false);
+  const [messages, setMessages] = useState<ChatMessageWithRestaurants[]>([]);
+  const [input, setInput] = useState('');
+  const [chatLoading, setChatLoading] = useState(false);
+
+  const onScrollBeginDrag = useCallback(() => setIsScrolling(true), []);
+  const onScrollEndDrag = useCallback(() => setIsScrolling(false), []);
+  const onMomentumScrollEnd = useCallback(() => setIsScrolling(false), []);
 
   useEffect(() => {
     let isMounted = true;
@@ -65,13 +96,67 @@ export function NetworkScreen() {
     [graph, session?.user?.id]
   );
 
+  const appendAssistant = useCallback(
+    (reply: string, restaurants: RestaurantRecommendation[]) => {
+      setMessages((prev) => [
+        ...prev,
+        { role: 'assistant', content: reply, restaurants },
+      ]);
+    },
+    []
+  );
+
+  const handleSend = useCallback(async () => {
+    const text = input.trim();
+    if (!text || chatLoading) return;
+    if (!session?.access_token) {
+      Alert.alert('Sign in required', 'Sign in to get restaurant recommendations.');
+      return;
+    }
+
+    setInput('');
+    const userMsg: ChatMessageWithRestaurants = { role: 'user', content: text };
+    setMessages((prev) => [...prev, userMsg]);
+    setChatLoading(true);
+
+    try {
+      const history = messages.map((m) => ({
+        role: m.role,
+        content: m.content,
+      }));
+      const res = await sendRestaurantChatMessage(session.access_token, {
+        message: text,
+        history,
+        latitude: undefined,
+        longitude: undefined,
+      });
+      appendAssistant(res.reply, res.restaurants ?? []);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Request failed. Try again.';
+      appendAssistant(`Sorry, I couldn't get recommendations right now. ${message}`, []);
+    } finally {
+      setChatLoading(false);
+    }
+  }, [input, chatLoading, session?.access_token, messages, appendAssistant]);
+
+  const handleSuggestionPress = useCallback((suggestion: string) => {
+    setInput(suggestion);
+  }, []);
+
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+    >
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
+        onScrollBeginDrag={onScrollBeginDrag}
+        onScrollEndDrag={onScrollEndDrag}
+        onMomentumScrollEnd={onMomentumScrollEnd}
       >
         <View style={styles.header}>
           <Text style={styles.title}>Taste Network</Text>
@@ -88,16 +173,35 @@ export function NetworkScreen() {
           </View>
         ) : (
           <>
-            <SocialGraph nodes={graph.nodes} edges={graph.edges} centerNodeId={centerNodeId} />
+            <SocialGraph
+              nodes={graph.nodes}
+              edges={graph.edges}
+              centerNodeId={centerNodeId}
+              isScrolling={isScrolling}
+            />
             <NetworkChatSection
-              accessToken={session?.access_token ?? undefined}
-              latitude={null}
-              longitude={null}
+              messages={messages}
+              onSuggestionPress={handleSuggestionPress}
+              suggestionChips={SUGGESTION_CHIPS}
             />
           </>
         )}
       </ScrollView>
-    </View>
+
+      <ChatComposer
+        value={input}
+        onChangeText={setInput}
+        onSend={handleSend}
+        loading={chatLoading}
+        disabled={!session?.access_token}
+        friends={graph.nodes.filter((n) => !n.isSelf)}
+        placeholder={
+          session?.access_token
+            ? 'Ask for a restaurant recommendation...'
+            : 'Sign in to get recommendations'
+        }
+      />
+    </KeyboardAvoidingView>
   );
 }
 
