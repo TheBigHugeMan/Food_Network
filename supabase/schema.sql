@@ -9,6 +9,11 @@ create table if not exists public.profiles (
   username text,
   display_name text,
   avatar_url text,
+  -- JSON text (optional) used for taste similarity, e.g.:
+  -- {
+  --   "tasteProfile": { "bitter": 42, "umami": 91, "sour": 58, "sweet": 35, "salty": 76 },
+  --   "cuisineFrequency": [{ "cuisine": "Japanese", "count": 41 }]
+  -- }
   preferences text,
   friends uuid[] default '{}',
   created_at timestamptz default now(),

@@ -104,6 +104,77 @@ uvicorn main:app --reload --host 0.0.0.0 --port 8000
 
 ---
 
+## 5. Social graph seed + verification
+
+Use this to populate `profiles.preferences`, `profiles.friends`, and `user_restaurant_visits` so the Network tab shows a real graph.
+
+### Seed data
+
+1. In Supabase: **SQL Editor** → **New query**.
+2. Run `supabase/schema.sql` first (if not already run).
+3. Run `supabase/social_graph_seed.sql`.
+
+Notes:
+- The seed script only links **existing profiles**. You need at least 2 users for a real edge graph.
+- If you only have one profile, you will still see the demo graph fallback in-app (as designed).
+
+### Create extra test users (if needed)
+
+Fast way:
+- Open the app on your phone/emulator.
+- Sign in with one account.
+- Sign out.
+- Sign in with a second Google account.
+- Repeat for a third account.
+- Re-run `supabase/social_graph_seed.sql`.
+
+### Run backend + mobile
+
+Backend:
+```bash
+cd backend
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
+```
+
+Mobile:
+```bash
+cd mobile
+npm install
+npm start
+```
+
+### Verify it works
+
+1. Log in to the app with any seeded user.
+2. Open the **Network** tab.
+3. Expected:
+   - You are in the center.
+   - Friends appear around you.
+   - Closer friends should generally have higher similarity.
+4. Tap an edge:
+   - You should see a modal with a percentage score and reason (e.g., shared cuisines or shared restaurants).
+5. If you still see the demo graph:
+   - Ensure there are at least 2 users in `public.profiles`.
+   - Re-run `supabase/social_graph_seed.sql`.
+   - Confirm backend is running and mobile `API_URL` points to it.
+
+### Quick DB checks in Supabase SQL Editor
+
+```sql
+select id, display_name, friends, preferences
+from public.profiles
+order by created_at;
+```
+
+```sql
+select user_id, count(*) as visits
+from public.user_restaurant_visits
+group by user_id
+order by visits desc;
+```
+
+---
+
 ## Sharing env vars with the team
 
 **Do not commit `.env`.** Options:

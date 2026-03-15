@@ -1,6 +1,7 @@
 import 'react-native-url-polyfill/auto';
 import { StatusBar } from 'expo-status-bar';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -39,6 +40,7 @@ function MainTabs() {
         headerShown: true,
         tabBarActiveTintColor: '#e85d26',
         tabBarInactiveTintColor: '#9e9e9e',
+        tabBarHideOnKeyboard: true,
         tabBarStyle: {
           backgroundColor: '#fff',
           borderTopColor: '#f0f0f0',
@@ -98,12 +100,14 @@ function RootNavigator() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <NavigationContainer>
-        <StatusBar style="auto" />
-        <RootNavigator />
-      </NavigationContainer>
-    </AuthProvider>
+    <SafeAreaProvider>
+      <AuthProvider>
+        <NavigationContainer>
+          <StatusBar style="auto" />
+          <RootNavigator />
+        </NavigationContainer>
+      </AuthProvider>
+    </SafeAreaProvider>
   );
 }
 

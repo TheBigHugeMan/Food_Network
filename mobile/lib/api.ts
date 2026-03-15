@@ -3,6 +3,8 @@
  * Set EXPO_PUBLIC_API_URL in .env (e.g. http://localhost:8000 or your Render URL)
  */
 
+// Temporarily hardcode the IP address since the .env file isn't being picked up
+const API_URL = 'http://118.139.22.161:8000';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 
@@ -52,6 +54,79 @@ export interface SearchResponse {
   top_restaurants: Restaurant[];
   all_nearby_restaurants?: Restaurant[];
   location?: { latitude: number; longitude: number };
+}
+
+export interface GraphNode {
+  id: string;
+  displayName?: string | null;
+  avatarUrl?: string | null;
+  isSelf?: boolean;
+}
+
+export interface GraphEdge {
+  fromId: string;
+  toId: string;
+  score: number;
+  reason: string;
+}
+
+export interface GraphResponse {
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+}
+
+// Restaurant chat (Gemini recommendations)
+export interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+export interface RestaurantChatRequest {
+  message: string;
+  history?: ChatMessage[];
+  latitude?: number;
+  longitude?: number;
+}
+
+export interface RestaurantRecommendation {
+  name: string;
+  address?: string | null;
+  cuisine?: string | null;
+  rating?: number | null;
+  reasoning?: string | null;
+}
+
+export interface RestaurantChatResponse {
+  reply: string;
+  restaurants: RestaurantRecommendation[];
+  follow_up_prompt?: string | null;
+}
+
+export async function sendRestaurantChatMessage(
+  accessToken: string,
+  body: RestaurantChatRequest
+): Promise<RestaurantChatResponse> {
+  const response = await fetch(`${API_URL}/api/restaurants/chat`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({
+      message: body.message,
+      history: body.history ?? [],
+      latitude: body.latitude ?? null,
+      longitude: body.longitude ?? null,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => null);
+    const detail = typeof errorData?.detail === 'string' ? errorData.detail : response.statusText;
+    throw new Error(`Chat failed: ${response.status} - ${detail}`);
+  }
+
+  return response.json();
 }
 
 export async function searchRestaurants(
@@ -119,6 +194,10 @@ export async function uploadProfileImage(uri: string, userId: string): Promise<{
   return response.json();
 }
 
+export async function getNetworkGraph(accessToken: string): Promise<GraphResponse> {
+  const response = await fetch(`${API_URL}/api/network/graph`, {
+    method: 'GET',
+    headers: {
 // ── Profile types ──────────────────────────────────────────────
 
 export interface TasteProfile {
@@ -165,6 +244,11 @@ export async function getProfile(userId: string, accessToken: string): Promise<U
   });
 
   if (!response.ok) {
+    throw new Error(`Network graph failed: ${response.status}`);
+  }
+
+  return response.json();
+}
     const errorData = await response.json().catch(() => null);
     throw new Error(`Failed to load profile: ${response.status} - ${errorData?.detail ?? response.statusText}`);
   }

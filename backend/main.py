@@ -1,10 +1,16 @@
 import os
 import time
+
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+from dotenv import load_dotenv
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from db import supabase
+from network_graph import router as network_graph_router
+from restaurants import router as restaurants_router
+
+load_dotenv()
 from routers.reviews import router as reviews_router
 from routers.restaurants import router as restaurants_router
 
@@ -22,6 +28,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(network_graph_router)
 # Mount feature routers (avoids merge conflicts; each feature in its own file)
 app.include_router(reviews_router)
 app.include_router(restaurants_router)
