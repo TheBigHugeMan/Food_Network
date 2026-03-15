@@ -84,7 +84,7 @@ Then:
 
 ```bash
 cd backend
-pip install fastapi uvicorn python-dotenv
+pip install fastapi uvicorn python-dotenv python-multipart
 cp .env.example .env
 ```
 
@@ -107,7 +107,7 @@ uvicorn main:app --reload --port 8000
 
 **Do not commit `.env`.** Options:
 
-1. **Share manually** – Send values in a secure channel (Slack, 1Password, etc.)
+1. **Share manually** – Send values in a secure channel (DIscord)
 2. **`.env.example`** – Keep a template in the repo (no secrets)
 3. **Team password manager** – Store secrets in 1Password, Bitwarden, etc.
 4. **Docs** – Add a short note in README: "Ask [name] for env vars"
