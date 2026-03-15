@@ -18,7 +18,7 @@ const MOCK_RECOMMENDATIONS = [
     cuisine: 'Japanese',
     rating: 4.7,
     photo_url: 'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=600&q=80',
-    address: '123 Main St, San Francisco, CA',
+    address: '16 Centreway, Clayton VIC',
   },
   {
     id: '2',
@@ -26,7 +26,7 @@ const MOCK_RECOMMENDATIONS = [
     cuisine: 'Italian',
     rating: 4.3,
     photo_url: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=600&q=80',
-    address: '456 Columbus Ave, San Francisco, CA',
+    address: '29 Dunstan St, Clayton VIC',
   },
   {
     id: '3',
@@ -34,7 +34,7 @@ const MOCK_RECOMMENDATIONS = [
     cuisine: 'Indian',
     rating: 4.5,
     photo_url: 'https://images.unsplash.com/photo-1585937421612-70a008356fbe?w=600&q=80',
-    address: '789 Mission St, San Francisco, CA',
+    address: '212 Clayton Rd, Clayton VIC',
   },
 ];
 
@@ -70,13 +70,6 @@ export function HomeScreen() {
         </Pressable>
       </View>
 
-      <Pressable
-        style={styles.createReviewButton}
-        onPress={() => setReviewModalVisible(true)}
-      >
-        <Text style={styles.createReviewButtonText}>Create Review</Text>
-      </Pressable>
-
       <ScrollView style={styles.results} showsVerticalScrollIndicator={false}>
         <>
           <Text style={styles.sectionLabel}>Recommended for You</Text>
@@ -97,6 +90,13 @@ export function HomeScreen() {
         visible={reviewModalVisible}
         onClose={() => setReviewModalVisible(false)}
       />
+
+      <Pressable
+        style={styles.fab}
+        onPress={() => setReviewModalVisible(true)}
+      >
+        <Text style={styles.fabIcon}>✏️</Text>
+      </Pressable>
     </View>
   );
 }
@@ -112,18 +112,24 @@ const styles = StyleSheet.create({
     gap: 8,
     marginBottom: 12,
   },
-  createReviewButton: {
-    alignSelf: 'flex-start',
+  fab: {
+    position: 'absolute',
+    bottom: 24,
+    right: 24,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     backgroundColor: '#e85d26',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 8,
-    marginBottom: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 6,
   },
-  createReviewButtonText: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '600',
+  fabIcon: {
+    fontSize: 22,
   },
   input: {
     flex: 1,

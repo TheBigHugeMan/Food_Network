@@ -9,7 +9,7 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useRoute } from '@react-navigation/native';
 import * as Location from 'expo-location';
 import { useAuth } from '../../lib/auth-context';
 import { searchRestaurants, type Restaurant } from '../../lib/api';
@@ -21,14 +21,12 @@ type LocationState =
   | { status: 'denied' };
 
 export function SearchScreen() {
-  const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const { session } = useAuth();
 
   const initialQuery: string = route.params?.initialQuery ?? '';
 
   const [query, setQuery] = useState(initialQuery);
-  const [suburb, setSuburb] = useState('');
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<Restaurant[]>([]);
   const [searched, setSearched] = useState(false);
@@ -96,15 +94,6 @@ export function SearchScreen() {
       return;
     }
 
-    const needsSuburb = loc.status !== 'granted';
-    if (needsSuburb && !suburb.trim()) {
-      Alert.alert(
-        'Location needed',
-        'Enter your suburb so we can find nearby restaurants.',
-      );
-      return;
-    }
-
     const accessToken = session?.access_token;
     if (!accessToken) {
       Alert.alert('Sign in required', 'Please sign in to search for restaurants.');
@@ -118,9 +107,7 @@ export function SearchScreen() {
 
     try {
       const hasCoords = loc.status === 'granted';
-      const resolvedSuburb = hasCoords
-        ? (loc as any).suburb
-        : suburb.trim() || undefined;
+      const resolvedSuburb = hasCoords ? (loc as any).suburb : undefined;
       const response = await searchRestaurants(
         trimmedQuery,
         accessToken,
@@ -140,20 +127,6 @@ export function SearchScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Suburb input – shown when device location is unavailable */}
-      {locationState.status === 'denied' && (
-        <View style={styles.locationRow}>
-          <Text style={styles.locationLabel}>Your suburb</Text>
-          <TextInput
-            style={styles.locationInput}
-            placeholder="e.g. Fitzroy"
-            value={suburb}
-            onChangeText={setSuburb}
-            returnKeyType="done"
-          />
-        </View>
-      )}
-
       {/* Location confirmed banner */}
       {locationState.status === 'granted' && (
         <View style={styles.locationBanner}>
@@ -163,12 +136,13 @@ export function SearchScreen() {
 
       {/* Search bar */}
       <View style={styles.searchBar}>
-        <Pressable style={styles.mapButton} onPress={() => navigation.navigate('Map')}>
-          <Text style={styles.mapButtonText}>Map</Text>
-        </Pressable>
         <TextInput
           style={styles.input}
-          placeholder="e.g. spicy Thai near me"
+          placeholder={
+            locationState.status === 'denied'
+              ? 'e.g. spicy Thai in Fitzroy'
+              : 'e.g. spicy Thai near me'
+          }
           value={query}
           onChangeText={setQuery}
           editable={!loading}
@@ -228,16 +202,6 @@ export function SearchScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 16, backgroundColor: '#fff' },
-  locationRow: { marginBottom: 12 },
-  locationLabel: { fontSize: 13, fontWeight: '600', color: '#555', marginBottom: 6 },
-  locationInput: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    fontSize: 15,
-  },
   locationBanner: {
     backgroundColor: '#e8f5e9',
     borderRadius: 8,
@@ -247,13 +211,6 @@ const styles = StyleSheet.create({
   },
   locationBannerText: { fontSize: 13, color: '#2e7d32', fontWeight: '500' },
   searchBar: { flexDirection: 'row', gap: 8, marginBottom: 16 },
-  mapButton: {
-    backgroundColor: '#34A853',
-    paddingHorizontal: 16,
-    justifyContent: 'center',
-    borderRadius: 8,
-  },
-  mapButtonText: { color: '#fff', fontWeight: '600' },
   input: {
     flex: 1,
     borderWidth: 1,
