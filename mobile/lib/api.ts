@@ -88,3 +88,48 @@ export async function uploadProfileImage(uri: string, userId: string): Promise<{
 
   return response.json();
 }
+
+/** Restaurant list item for pickers (id is uuid from Supabase restaurants table). */
+export interface RestaurantOption {
+  id: string;
+  name: string;
+}
+
+export async function getRestaurants(): Promise<RestaurantOption[]> {
+  const response = await fetch(`${API_URL}/api/restaurants`);
+  if (!response.ok) throw new Error(`Failed to load restaurants: ${response.status}`);
+  return response.json();
+}
+
+export async function createReview(
+  profileId: string,
+  restaurantId: string,
+  description: string,
+  rating: number,
+  imageUri: string,
+  _accessToken?: string
+): Promise<{ status: string; image_url: string }> {
+  const filename = imageUri.split('/').pop();
+  const match = /\.(\w+)$/.exec(filename || '');
+  const type = match ? `image/${match[1]}` : 'image/jpeg';
+
+  const formData = new FormData();
+  // @ts-ignore - React Native FormData
+  formData.append('file', { uri: imageUri, name: filename || 'review.jpg', type });
+  formData.append('profile_id', profileId);
+  formData.append('restaurant_id', restaurantId);
+  formData.append('description', description);
+  formData.append('rating', String(rating));
+
+  const response = await fetch(`${API_URL}/api/reviews`, {
+    method: 'POST',
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => null);
+    const msg = errorData?.detail || response.statusText;
+    throw new Error(`Review failed: ${response.status} - ${msg}`);
+  }
+  return response.json();
+}
